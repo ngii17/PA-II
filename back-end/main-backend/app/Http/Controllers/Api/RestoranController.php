@@ -13,21 +13,53 @@ use Illuminate\Support\Facades\Validator;
 // --- IMPORT MIDTRANS ---
 use Midtrans\Config;
 use Midtrans\Snap;
+use App\Models\event\Event;
 
 class RestoranController extends Controller
 {
     /**
      * 1. MENGAMBIL DAFTAR MENU
      */
-    public function getMenus()
-    {
-        try {
+// --- PASTIKAN IMPORT MODEL EVENT SUDAH ADA DI ATAS ---
+
+
+// ... di dalam class RestoranController ...
+
+public function getMenus()
+{
+    try {
+        // 1. Cari tahu event apa yang sedang aktif saat ini
+        $activeEvent = Event::where('is_active', true)->first();
+
+        // 2. LOGIKA FILTER (Poin permintaanmu):
+        
+        // JIKA TEMA 'DEFAULT' (Bukan Hari Besar)
+        if (!$activeEvent || $activeEvent->event_code == 'default') {
+            // Ambil SEMUA menu tanpa terkecuali
             $menus = Menu::with(['kategori', 'status'])->get();
-            return response()->json(['success' => true, 'data' => $menus], 200);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        } 
+        
+        // JIKA TEMA HARI BESAR AKTIF (HUT RI, Valentine, dll)
+        else {
+            // HANYA ambil menu yang didaftarkan (punya relasi) ke event tersebut
+            // Menu yang tidak didaftarkan oleh Staff ke event ini akan otomatis tersembunyi
+            $menus = $activeEvent->menus()->with(['kategori', 'status'])->get();
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Daftar menu berhasil dimuat.',
+            'active_theme' => $activeEvent->event_code ?? 'default',
+            'data'    => $menus
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal mengambil menu: ' . $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * 2. PROSES PEMESANAN & GENERATE PEMBAYARAN MIDTRANS
@@ -220,4 +252,6 @@ public function placeOrder(Request $request)
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    
 }

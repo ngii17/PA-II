@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_services.dart';
-import 'edit_profile_screen.dart'; // Import halaman edit
+import 'edit_profile_screen.dart';
+import '../event/event_header.dart'; // <--- IMPORT HEADER EVENT
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,7 +19,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
-  // Fungsi untuk memuat data profil
   void _loadProfile() {
     setState(() {
       _profileData = ApiServices.getUserProfile();
@@ -27,14 +27,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // KUNCI: Mengambil warna tema aktif dari database lewat Provider
+    final primaryColor = Theme.of(context).primaryColor;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Profil Saya"),
-        backgroundColor: Colors.blueAccent,
+        backgroundColor: primaryColor, // Ikuti tema
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          // --- TOMBOL EDIT DI APPBAR ---
           FutureBuilder<Map<String, dynamic>>(
             future: _profileData,
             builder: (context, snapshot) {
@@ -42,16 +44,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 return IconButton(
                   icon: const Icon(Icons.edit_note_rounded, size: 28),
                   onPressed: () {
-                    // Pindah ke halaman Edit sambil membawa data user saat ini
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => EditProfileScreen(userData: snapshot.data?['data']),
                       ),
                     ).then((value) {
-                      // JIKA KEMBALI DARI EDIT: Cek apakah ada perubahan (value == true)
                       if (value == true) {
-                        _loadProfile(); // Segarkan data profil di layar
+                        _loadProfile(); 
                       }
                     });
                   },
@@ -66,7 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         future: _profileData,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: primaryColor));
           }
 
           if (snapshot.hasError || snapshot.data?['success'] == false) {
@@ -78,20 +78,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return SingleChildScrollView(
             child: Column(
               children: [
-                // 1. Header Profil (Avatar & Nama)
+                // --- 1. BANNER EVENT (Paling Atas) ---
+                const EventHeader(),
+
+                // 2. Header Profil (Avatar & Nama)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 40),
-                  decoration: const BoxDecoration(
-                    color: Colors.blueAccent,
-                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+                  decoration: BoxDecoration(
+                    color: primaryColor, // Ikuti tema
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
                   ),
                   child: Column(
                     children: [
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: Colors.white,
-                        backgroundImage: NetworkImage(user['profile_photo']),
+                        backgroundImage: user['profile_photo'] != null 
+                            ? NetworkImage(user['profile_photo']) 
+                            : null,
+                        child: user['profile_photo'] == null 
+                            ? Icon(Icons.person, size: 60, color: primaryColor) 
+                            : null,
                       ),
                       const SizedBox(height: 15),
                       Text(
@@ -106,20 +114,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(height: 25),
 
-                // 2. Daftar Informasi (Detail)
+                // 3. Daftar Informasi
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
-                      _buildProfileItem(Icons.email_outlined, "Email", user['email']),
-                      _buildProfileItem(Icons.phone_android_outlined, "Nomor HP", user['phone']),
-                      _buildProfileItem(Icons.location_on_outlined, "Alamat", user['address']),
-                      _buildProfileItem(Icons.calendar_today_outlined, "Member Sejak", user['created_at']),
+                      _buildProfileItem(Icons.email_outlined, "Email", user['email'], primaryColor),
+                      _buildProfileItem(Icons.phone_android_outlined, "Nomor HP", user['phone'], primaryColor),
+                      _buildProfileItem(Icons.location_on_outlined, "Alamat", user['address'], primaryColor),
+                      _buildProfileItem(Icons.calendar_today_outlined, "Member Sejak", user['created_at'], primaryColor),
                     ],
                   ),
                 ),
+                const SizedBox(height: 50),
               ],
             ),
           );
@@ -128,14 +137,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileItem(IconData icon, String label, String value) {
+  Widget _buildProfileItem(IconData icon, String label, String value, Color color) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 15),
       color: Colors.grey[100],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: ListTile(
-        leading: Icon(icon, color: Colors.blueAccent),
+        leading: Icon(icon, color: color), // Icon ikuti tema
         title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
         subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),

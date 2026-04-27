@@ -3,7 +3,9 @@
 use App\Http\Controllers\Api\HotelController;
 use App\Http\Controllers\Api\RestoranController;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\Api\UlasanController;
+use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\PromoController;
 /*
 |--------------------------------------------------------------------------
 | API Routes - Port 8001
@@ -39,3 +41,20 @@ Route::get('/menus/order/status/{id}', [RestoranController::class, 'checkOrderSt
 
 // Route untuk riwayat pesanan restoran
 Route::get('/menus/order/history', [RestoranController::class, 'getOrderHistory']);
+
+
+// Rute untuk kirim ulasan
+Route::post('/review/hotel', [UlasanController::class, 'storeHotelReview']);
+Route::post('/review/restoran', [UlasanController::class, 'storeRestoReview']);
+
+// Rute untuk melihat ulasan (Public/Umum) - Syarat 3 & 4
+Route::get('/review/hotel/{tipe_kamar_id}', [UlasanController::class, 'getHotelReviews']);
+Route::get('/review/restoran/{menu_id}', [UlasanController::class, 'getRestoReviews']);
+
+
+// Rute untuk cek tema aplikasi (Langkah 2.3)
+Route::get('/active-event', [EventController::class, 'getActiveEvent']);
+
+
+// Rute cek kode promo manual
+Route::post('/promo/check', [PromoController::class, 'checkPromo']);

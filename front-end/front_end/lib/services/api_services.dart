@@ -5,10 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiServices {
   // 1. Alamat Server Auth (Mikroservices - Port 8000)
-  static const String _authUrl = "http://10.167.96.132:8000/api";
+  static const String _authUrl = "http://10.209.61.132:8000/api";
   
   // 2. Alamat Server Bisnis (Main Backend - Port 8001)
-  static const String _hotelUrl = "http://10.167.96.132:8001/api";
+  static const String _hotelUrl = "http://10.209.61.132:8001/api";
 
   // ==========================================
   // FUNGSI KHUSUS HOTEL (Server Port 8001)
@@ -347,6 +347,95 @@ class ApiServices {
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Terjadi kesalahan: $e'};
+    }
+  }
+
+  // ==========================================
+  // FUNGSI KHUSUS ULASAN (Server Port 8001)
+  // ==========================================
+
+  // 13. Kirim Ulasan Hotel
+  static Future<Map<String, dynamic>> storeHotelReview(Map<String, dynamic> data) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$_hotelUrl/review/hotel"),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: jsonEncode(data),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal kirim ulasan hotel: $e'};
+    }
+  }
+
+  // 14. Kirim Ulasan Restoran
+  static Future<Map<String, dynamic>> storeRestoReview(Map<String, dynamic> data) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$_hotelUrl/review/restoran"),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: jsonEncode(data),
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal kirim ulasan resto: $e'};
+    }
+  }
+
+  // 15. Ambil Ulasan Hotel (Untuk Umum)
+  static Future<Map<String, dynamic>> getHotelReviews(int tipeKamarId) async {
+    try {
+      final response = await http.get(Uri.parse("$_hotelUrl/review/hotel/$tipeKamarId"));
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal ambil ulasan: $e'};
+    }
+  }
+
+  // 16. Ambil Ulasan Restoran (Untuk Umum)
+  static Future<Map<String, dynamic>> getRestoReviews(int menuId) async {
+    try {
+      final response = await http.get(Uri.parse("$_hotelUrl/review/restoran/$menuId"));
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal ambil ulasan: $e'};
+    }
+  }
+
+
+  // 17. FUNGSI AMBIL TEMA EVENT YANG AKTIF (Port 8001)
+  static Future<Map<String, dynamic>> getActiveEvent() async {
+    try {
+      final response = await http.get(
+        Uri.parse("$_hotelUrl/active-event"),
+        headers: {'Accept': 'application/json'},
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'event_code': 'default'};
+    }
+  }
+
+
+
+  // 18. FUNGSI CEK KODE PROMO MANUAL (Ke Port 8001)
+  static Future<Map<String, dynamic>> checkPromoCode(String code, String category) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$_hotelUrl/promo/check"),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'kode_promo': code,
+          'kategori': category, // Isinya 'hotel' atau 'restoran'
+        }),
+      );
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal mengecek promo: $e'};
     }
   }
 

@@ -1,146 +1,166 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/api_services.dart';
+import '../event/event_header.dart'; // <--- IMPORT HEADER
 
 class ReservationDetailScreen extends StatelessWidget {
   final Map<String, dynamic> reservation;
 
   const ReservationDetailScreen({super.key, required this.reservation});
 
-  @override
-  Widget build(BuildContext context) {
-    // --- PELINDUNG 1: Pastikan 'details' tidak Null ---
-    // Jika null, kita anggap List kosong. Jika bukan List, kita jadikan List kosong.
-    final List<dynamic> details = (reservation['details'] != null && reservation['details'] is List) 
-        ? reservation['details'] 
-        : [];
+  void _showReviewDialog(BuildContext context) {
+    final TextEditingController commentController = TextEditingController();
+    int selectedRating = 5;
+    bool isSending = false;
 
-    // --- PELINDUNG 2: Ambil data tamu pertama dengan aman ---
-    // Jika list kosong, kita kasih data default agar tidak error merah
-    final Map<String, dynamic> detailTamu = details.isNotEmpty 
-        ? details[0] as Map<String, dynamic> 
-        : {
-            "nama_tamu": "Data tidak tersedia",
-            "nik_identitas": "-",
-            "jumlah_tamu": 0
-          };
-
-    // Logika Warna Status
-    Color statusColor;
-    String statusText;
-    switch (reservation['status_reservasi_id'].toString()) { // Pakai toString() agar aman jika tipenya Int/String
-      case '2':
-        statusColor = Colors.green;
-        statusText = "SUDAH DIBAYAR";
-        break;
-      case '1':
-        statusColor = Colors.orange;
-        statusText = "MENUNGGU PEMBAYARAN";
-        break;
-      default:
-        statusColor = Colors.red;
-        statusText = "BATAL / GAGAL";
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Detail Pemesanan"),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Info Kamar
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: statusColor),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    reservation['nama_tipe']?.toString() ?? "Kamar",
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    statusText,
-                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: const Text("Beri Ulasan Kamar"),
+          content: SingleChildScrollView( // Agar tidak overflow saat keyboard muncul
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Bagaimana pengalaman menginap Anda?", textAlign: TextAlign.center),
+                const SizedBox(height: 15),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        index < selectedRating ? Icons.star : Icons.star_border,
+                        color: Colors.amber, size: 30,
+                      ),
+                      onPressed: isSending ? null : () => setStateDialog(() => selectedRating = index + 1),
+                    );
+                  }),
+                ),
+                TextField(
+                  controller: commentController,
+                  maxLines: 3,
+                  enabled: !isSending,
+                  decoration: const InputDecoration(hintText: "Tulis komentar (min. 5 huruf)...", border: OutlineInputBorder()),
+                ),
+              ],
             ),
-            const SizedBox(height: 25),
+          ),
+          actions: [
+            TextButton(onPressed: isSending ? null : () => Navigator.pop(context), child: const Text("Batal")),
+            ElevatedButton(
+              onPressed: isSending ? null : () async {
+                if (commentController.text.length < 5) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Komentar minimal 5 huruf")));
+                  return;
+                }
+                setStateDialog(() => isSending = true);
+                final SharedPreferences prefs = await SharedPreferences.getInstance();
+                int userId = prefs.getInt('user_id') ?? 0;
 
-            _buildSectionTitle("Informasi Menginap"),
-            _buildInfoCard([
-              _buildRow("Check-in", reservation['tgl_checkin']?.toString() ?? "-"),
-              _buildRow("Check-out", reservation['tgl_checkout']?.toString() ?? "-"),
-              _buildRow("Durasi", "${reservation['total_malam'] ?? 0} Malam"),
-            ]),
+                final result = await ApiServices.storeHotelReview({
+                  "user_id": userId,
+                  "tipe_kamar_id": reservation['tipe_kamar_id'], 
+                  "rating": selectedRating,
+                  "komentar": commentController.text,
+                });
 
-            const SizedBox(height: 20),
-
-            _buildSectionTitle("Detail Tamu"),
-            _buildInfoCard([
-              _buildRow("Nama Tamu", detailTamu['nama_tamu']?.toString() ?? "-"),
-              _buildRow("Nomor NIK", detailTamu['nik_identitas']?.toString() ?? "-"),
-              _buildRow("Jumlah Tamu", "${detailTamu['jumlah_tamu'] ?? 0} Orang"),
-            ]),
-
-            const SizedBox(height: 20),
-
-            _buildSectionTitle("Rincian Pembayaran"),
-            _buildInfoCard([
-              _buildRow("Metode", reservation['metode_pembayaran']?.toString() ?? "-"),
-              _buildRow(
-                "Total Harga", 
-                "Rp ${double.parse(reservation['total_harga']?.toString() ?? '0').toStringAsFixed(0)}"
-              ),
-            ]),
+                setStateDialog(() => isSending = false);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(result['message']), backgroundColor: result['success'] ? Colors.green : Colors.red),
+                  );
+                }
+              },
+              child: const Text("Kirim"),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10, left: 5),
-      child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    // KUNCI: Ambil warna tema aktif (Valentine = Pink, HUT RI = Merah)
+    final primaryColor = Theme.of(context).primaryColor;
 
-  Widget _buildInfoCard(List<Widget> children) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.all(15),
-        child: Column(children: children),
+    final List<dynamic> details = (reservation['details'] != null && reservation['details'] is List) ? reservation['details'] : [];
+    final Map<String, dynamic> detailTamu = details.isNotEmpty ? details[0] as Map<String, dynamic> : {"nama_tamu": "-", "nik_identitas": "-", "jumlah_tamu": 0};
+
+    bool isPaid = reservation['status_reservasi_id'].toString() == '2';
+    Color statusColor = isPaid ? Colors.green : Colors.orange;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Detail Reservasi"), 
+        backgroundColor: primaryColor, // Ikuti Tema (Pink/Merah/Biru)
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // --- 1. BANNER EVENT (Agar sinkron dengan Home) ---
+            const EventHeader(),
+
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1), 
+                      borderRadius: BorderRadius.circular(12), 
+                      border: Border.all(color: statusColor)
+                    ),
+                    child: Column(
+                      children: [
+                        Text(reservation['nama_tipe']?.toString() ?? "Kamar", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        Text(isPaid ? "SUDAH DIBAYAR" : "MENUNGGU PEMBAYARAN", style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 25),
+                  _itemRow("Check-in", reservation['tgl_checkin'] ?? "-"),
+                  _itemRow("Check-out", reservation['tgl_checkout'] ?? "-"),
+                  _itemRow("Nama Tamu", detailTamu['nama_tamu']),
+                  const Divider(height: 40),
+                  
+                  if (isPaid)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showReviewDialog(context),
+                        icon: const Icon(Icons.rate_review, color: Colors.white),
+                        label: const Text("BERI ULASAN KAMAR", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor, // Tombol ikuti tema
+                          padding: const EdgeInsets.all(15),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildRow(String label, String value) {
+  Widget _itemRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              value, 
-              style: const TextStyle(fontWeight: FontWeight.w600),
-              textAlign: TextAlign.right,
-            ),
-          ),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 16)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),
     );

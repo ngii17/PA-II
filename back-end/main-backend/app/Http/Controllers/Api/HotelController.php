@@ -174,7 +174,7 @@ class HotelController extends Controller
     /**
      * 3. AMBIL RIWAYAT RESERVASI
      */
-    public function getReservationHistory(Request $request)
+public function getReservationHistory(Request $request)
     {
         $userId = $request->query('user_id');
 
@@ -191,6 +191,7 @@ class HotelController extends Controller
             $data = $history->map(function ($res) {
                 return [
                     'id'                  => $res->id,
+                    'tipe_kamar_id'       => $res->tipe_kamar_id, // <--- INI WAJIB ADA AGAR FLUTTER BISA KIRIM ULASAN
                     'tgl_checkin'         => $res->tgl_checkin,
                     'tgl_checkout'        => $res->tgl_checkout,
                     'total_malam'         => $res->total_malam,
@@ -209,7 +210,6 @@ class HotelController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
     /**
      * 4. WEBHOOK CALLBACK (Update Status & Assign Kamar Otomatis)
      */
