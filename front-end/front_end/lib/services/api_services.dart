@@ -5,10 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiServices {
   // 1. Alamat Server Auth (Mikroservices - Port 8000)
-  static const String _authUrl = "http://10.209.61.132:8000/api";
+  static const String _authUrl = "http://10.106.22.132:8000/api";
   
   // 2. Alamat Server Bisnis (Main Backend - Port 8001)
-  static const String _hotelUrl = "http://10.209.61.132:8001/api";
+  static const String _hotelUrl = "http://10.106.22.132:8001/api";
 
   // ==========================================
   // FUNGSI KHUSUS HOTEL (Server Port 8001)
