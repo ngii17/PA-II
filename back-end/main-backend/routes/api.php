@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UlasanController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\PromoController;
+use App\Services\NotificationClientService;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes - Port 8001
@@ -58,3 +60,18 @@ Route::get('/active-event', [EventController::class, 'getActiveEvent']);
 
 // Rute cek kode promo manual
 Route::post('/promo/check', [PromoController::class, 'checkPromo']);
+
+
+Route::get('/test-notif-resto-ke-8002', function() {
+    $notif = app(\App\Services\NotificationClientService::class);
+    // Masukkan token asli kamu di sini (bisa ambil dari tabel reservasi hotel yang sukses)
+    $tokenAsli = "MASUKKAN_TOKEN_ASLI_DARI_PGADMIN_DI_SINI"; 
+    
+    $res = $notif->orderConfirmed(
+        $tokenAsli, 
+        1, 
+        77, // ID pesanan bohongan
+        50000 // Harga bohongan
+    );
+    return response()->json($res);
+});

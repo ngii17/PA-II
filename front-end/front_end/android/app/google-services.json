@@ -1,0 +1,29 @@
+﻿{
+  "project_info": {
+    "project_number": "821334012873",
+    "project_id": "purnama-hotel",
+    "storage_bucket": "purnama-hotel.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:821334012873:android:ac8c87e3b6c75caa19ae18",
+        "android_client_info": {
+          "package_name": "com.example.front_end"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrb19PWdZHQ2N8UVy0nbI9f5mffEJ3mXc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

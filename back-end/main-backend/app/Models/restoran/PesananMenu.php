@@ -10,14 +10,14 @@ class PesananMenu extends Model
     protected $table = 'pesanan_menu';
 
     // Daftar kolom yang boleh diisi secara massal
-    protected $fillable = [
-        'user_id',
-        'promo_id',
-        'total_harga',
-        'metode_pembayaran',
-        'snap_token',           // <--- TAMBAHKAN INI
-        'status_pembayaran_id', // <--- TAMBAHKAN INI
-    ];
+protected $fillable = [
+    'user_id',
+    'fcm_token', // <--- Pastikan baris ini ada
+    'total_harga',
+    'metode_pembayaran',
+    'snap_token',
+    'status_pembayaran_id',
+];
 
     /**
      * RELASI: Satu nota punya banyak rincian menu

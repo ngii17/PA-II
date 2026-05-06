@@ -18,157 +18,152 @@ use App\Models\event\Event;
 class RestoranController extends Controller
 {
     /**
-     * 1. MENGAMBIL DAFTAR MENU
+     * 1. MENGAMBIL DAFTAR MENU (DENGAN FILTER EVENT)
      */
-// --- PASTIKAN IMPORT MODEL EVENT SUDAH ADA DI ATAS ---
+    public function getMenus()
+    {
+        try {
+            // 1. Cari tahu event apa yang sedang aktif saat ini
+            $activeEvent = Event::where('is_active', true)->first();
 
+            // 2. LOGIKA FILTER (Poin permintaanmu):
+            
+            // JIKA TEMA 'DEFAULT' (Bukan Hari Besar)
+            if (!$activeEvent || $activeEvent->event_code == 'default') {
+                // Ambil SEMUA menu tanpa terkecuali
+                $menus = Menu::with(['kategori', 'status'])->get();
+            } 
+            
+            // JIKA TEMA HARI BESAR AKTIF (HUT RI, Valentine, dll)
+            else {
+                // HANYA ambil menu yang didaftarkan (punya relasi) ke event tersebut
+                $menus = $activeEvent->menus()->with(['kategori', 'status'])->get();
+            }
 
-// ... di dalam class RestoranController ...
+            return response()->json([
+                'success' => true,
+                'message' => 'Daftar menu berhasil dimuat.',
+                'active_theme' => $activeEvent->event_code ?? 'default',
+                'data'    => $menus
+            ], 200);
 
-public function getMenus()
-{
-    try {
-        // 1. Cari tahu event apa yang sedang aktif saat ini
-        $activeEvent = Event::where('is_active', true)->first();
-
-        // 2. LOGIKA FILTER (Poin permintaanmu):
-        
-        // JIKA TEMA 'DEFAULT' (Bukan Hari Besar)
-        if (!$activeEvent || $activeEvent->event_code == 'default') {
-            // Ambil SEMUA menu tanpa terkecuali
-            $menus = Menu::with(['kategori', 'status'])->get();
-        } 
-        
-        // JIKA TEMA HARI BESAR AKTIF (HUT RI, Valentine, dll)
-        else {
-            // HANYA ambil menu yang didaftarkan (punya relasi) ke event tersebut
-            // Menu yang tidak didaftarkan oleh Staff ke event ini akan otomatis tersembunyi
-            $menus = $activeEvent->menus()->with(['kategori', 'status'])->get();
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil menu: ' . $e->getMessage()
+            ], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar menu berhasil dimuat.',
-            'active_theme' => $activeEvent->event_code ?? 'default',
-            'data'    => $menus
-        ], 200);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal mengambil menu: ' . $e->getMessage()
-        ], 500);
     }
-}
 
     /**
      * 2. PROSES PEMESANAN & GENERATE PEMBAYARAN MIDTRANS
      */
-public function placeOrder(Request $request)
-{
-    // 1. Validasi Input Dasar
-    $validator = Validator::make($request->all(), [
-        'user_id' => 'required',
-        'metode_pembayaran' => 'required|string',
-        'items' => 'required|array',
-        'items.*.menu_id' => 'required|exists:menu,id',
-        'items.*.jumlah' => 'required|integer|min:1',
-    ]);
-
-    if ($validator->fails()) {
-        return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-    }
-
-    DB::beginTransaction();
-
-    try {
-        $totalHarga = 0;
-        $orderItems = [];
-
-        // --- 2. LOGIKA VALIDASI & PENGURANGAN STOK ---
-        foreach ($request->items as $item) {
-            $menu = Menu::find($item['menu_id']);
-
-            // Cek apakah stok cukup
-            if ($menu->stok < $item['jumlah']) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Stok untuk {$menu->nama_menu} tidak mencukupi. Sisa stok: {$menu->stok}"
-                ], 400);
-            }
-
-            // Kurangi stok di database
-            $menu->decrement('stok', $item['jumlah']);
-
-            // Hitung harga
-            $totalHarga += ($menu->harga * $item['jumlah']);
-            $orderItems[] = [
-                'menu_id' => $menu->id,
-                'jumlah' => $item['jumlah'],
-                'harga_at_porsi' => $menu->harga,
-                'status_pesanan_id' => 1,
-            ];
-        }
-
-        // 3. Simpan Nota (Header)
-        $pesanan = PesananMenu::create([
-            'user_id' => $request->user_id,
-            'total_harga' => $totalHarga,
-            'metode_pembayaran' => $request->metode_pembayaran,
-            'status_pembayaran_id' => 1, // Pending
+    public function placeOrder(Request $request)
+    {
+        // 1. Validasi Input Dasar (Ditambahkan fcm_token)
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required',
+            'fcm_token' => 'nullable|string', // <--- TAMBAHAN: Validasi Token HP
+            'metode_pembayaran' => 'required|string',
+            'items' => 'required|array', 
+            'items.*.menu_id' => 'required|exists:menu,id',
+            'items.*.jumlah' => 'required|integer|min:1',
         ]);
 
-        // 4. Simpan Rincian (Detail)
-        foreach ($orderItems as $orderItem) {
-            $pesanan->details()->create($orderItem);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        // 5. Integrasi Midtrans (Hanya jika bukan Bayar di Kasir)
-        $snapToken = null;
-        $redirectUrl = null;
+        DB::beginTransaction();
 
-        if ($request->metode_pembayaran !== 'Bayar di Kasir') {
-            Config::$serverKey = env('MIDTRANS_SERVER_KEY');
-            Config::$isProduction = env('MIDTRANS_IS_PRODUCTION');
-            Config::$isSanitized = true;
-            Config::$is3ds = true;
+        try {
+            $totalHarga = 0;
+            $orderItems = [];
 
-            $enabledPayments = ($request->metode_pembayaran == 'Transfer Bank') ? ['bank_transfer'] : ['gopay', 'shopeepay', 'qris'];
+            // --- 2. LOGIKA VALIDASI & PENGURANGAN STOK ---
+            foreach ($request->items as $item) {
+                $menu = Menu::find($item['menu_id']);
 
-            $params = [
-                'transaction_details' => [
-                    'order_id' => 'RESTO-' . $pesanan->id . '-' . time(),
-                    'gross_amount' => (int) $totalHarga,
-                ],
-                'customer_details' => ['first_name' => 'User ID ' . $request->user_id],
-                'enabled_payments' => $enabledPayments,
-            ];
+                if ($menu->stok < $item['jumlah']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Stok untuk {$menu->nama_menu} tidak mencukupi. Sisa stok: {$menu->stok}"
+                    ], 400);
+                }
 
-            $midtransResponse = Snap::createTransaction($params);
-            $snapToken = $midtransResponse->token;
-            $redirectUrl = $midtransResponse->redirect_url;
+                $menu->decrement('stok', $item['jumlah']);
 
-            $pesanan->update(['snap_token' => $snapToken]);
+                $totalHarga += ($menu->harga * $item['jumlah']);
+                $orderItems[] = [
+                    'menu_id' => $menu->id,
+                    'jumlah' => $item['jumlah'],
+                    'harga_at_porsi' => $menu->harga,
+                    'status_pesanan_id' => 1, // Default: Menunggu
+                ];
+            }
+
+            // 3. Simpan Nota (Header) - Sekarang menyimpan fcm_token
+            $pesanan = PesananMenu::create([
+                'user_id' => $request->user_id,
+                'fcm_token' => $request->fcm_token, // <--- TAMBAHAN: Simpan Token HP
+                'total_harga' => $totalHarga,
+                'metode_pembayaran' => $request->metode_pembayaran,
+                'status_pembayaran_id' => 1, // Pending
+            ]);
+
+            // 4. Simpan Rincian (Detail)
+            foreach ($orderItems as $orderItem) {
+                $pesanan->details()->create($orderItem);
+            }
+
+            // 5. Integrasi Midtrans
+            $snapToken = null;
+            $redirectUrl = null;
+
+            if ($request->metode_pembayaran !== 'Bayar di Kasir') {
+                Config::$serverKey = env('MIDTRANS_SERVER_KEY');
+                Config::$isProduction = env('MIDTRANS_IS_PRODUCTION');
+                Config::$isSanitized = true;
+                Config::$is3ds = true;
+
+                $enabledPayments = ($request->metode_pembayaran == 'Transfer Bank') ? ['bank_transfer'] : ['gopay', 'shopeepay', 'qris'];
+
+                $params = [
+                    'transaction_details' => [
+                        'order_id' => 'RESTO-' . $pesanan->id . '-' . time(),
+                        'gross_amount' => (int) $totalHarga,
+                    ],
+                    'customer_details' => ['first_name' => 'User ID ' . $request->user_id],
+                    'enabled_payments' => $enabledPayments,
+                ];
+
+                $midtransResponse = Snap::createTransaction($params);
+                $snapToken = $midtransResponse->token;
+                $redirectUrl = $midtransResponse->redirect_url;
+
+                $pesanan->update(['snap_token' => $snapToken]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success'      => true,
+                'message'      => 'Pesanan berhasil dibuat!',
+                'snap_token'   => $snapToken,
+                'redirect_url' => $redirectUrl,
+                'data'         => [ 
+                    'order_id'    => $pesanan->id,
+                    'total_bayar' => $totalHarga
+                ]
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['success' => false, 'message' => 'Gagal: ' . $e->getMessage()], 500);
         }
-
-        DB::commit();
-
-        return response()->json([
-            'success'      => true,
-            'message'      => 'Pesanan berhasil dibuat!',
-            'snap_token'   => $snapToken,
-            'redirect_url' => $redirectUrl,
-            'data'         => [ // Kita bungkus kembali agar Flutter tidak bingung
-                'order_id'    => $pesanan->id,
-                'total_bayar' => $totalHarga
-            ]
-        ], 201);
-
-    } catch (\Exception $e) {
-        DB::rollback();
-        return response()->json(['success' => false, 'message' => 'Gagal: ' . $e->getMessage()], 500);
     }
-}    /**
+
+    /**
      * 3. MENGAMBIL KATEGORI
      */
     public function getCategories()
@@ -182,28 +177,24 @@ public function placeOrder(Request $request)
     }
 
     /**
-     * 4. WEBHOOK CALLBACK RESTORAN (Update Status Bayar Otomatis)
+     * 4. WEBHOOK CALLBACK RESTORAN
      */
     public function handleRestoCallback(Request $request)
     {
         $serverKey = env('MIDTRANS_SERVER_KEY');
-        
-        // 1. Buat Hash untuk mencocokkan Signature Key (Keamanan)
         $hashed = hash("sha512", $request->order_id . $request->status_code . $request->gross_amount . $serverKey);
 
         if ($hashed == $request->signature_key) {
-            // 2. Ambil ID Pesanan dari Order ID Midtrans (Format: RESTO-ID-TIME)
             $orderIdParts = explode('-', $request->order_id);
             $pesananId = $orderIdParts[1];
 
             $pesanan = PesananMenu::find($pesananId);
 
             if ($pesanan) {
-                // 3. Logika Update Status Pembayaran
                 if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
-                    $pesanan->update(['status_pembayaran_id' => 2]); // 2 = Terbayar/Lunas
+                    $pesanan->update(['status_pembayaran_id' => 2]); 
                 } else if (in_array($request->transaction_status, ['deny', 'expire', 'cancel'])) {
-                    $pesanan->update(['status_pembayaran_id' => 4]); // 4 = Batal/Gagal
+                    $pesanan->update(['status_pembayaran_id' => 4]); 
                 }
             }
         }
@@ -212,7 +203,7 @@ public function placeOrder(Request $request)
     }
 
     /**
-     * 5. CEK STATUS PESANAN (Polling dari Flutter)
+     * 5. CEK STATUS PESANAN (Polling)
      */
     public function checkOrderStatus($id)
     {
@@ -221,12 +212,12 @@ public function placeOrder(Request $request)
 
         return response()->json([
             'success' => true,
-            // Pastikan kuncinya 'status_bayar_id' agar sama dengan harapan Flutter
             'status_bayar_id' => (int) $pesanan->status_pembayaran_id, 
         ]);
     }
+
     /**
-     * 6. AMBIL RIWAYAT PESANAN RESTORAN USER
+     * 6. AMBIL RIWAYAT PESANAN
      */
     public function getOrderHistory(Request $request)
     {
@@ -237,7 +228,6 @@ public function placeOrder(Request $request)
         }
 
         try {
-            // Ambil data pesanan beserta detail makanan di dalamnya
             $history = PesananMenu::with(['details.menu'])
                 ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc')
@@ -252,6 +242,4 @@ public function placeOrder(Request $request)
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
-    
 }

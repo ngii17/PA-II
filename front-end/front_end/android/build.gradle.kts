@@ -1,3 +1,15 @@
+buildscript {
+    // --- TAMBAHAN WAJIB: Kasih tahu Gradle di mana cari plugin Google ---
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Poin yang kamu tambahkan tadi
+        classpath("com.google.gms:google-services:4.4.1") 
+    }
+}
+
 allprojects {
     repositories {
         google()

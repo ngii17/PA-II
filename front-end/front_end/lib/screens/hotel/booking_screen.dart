@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart'; 
 import 'waiting_payment_screen.dart'; 
 import '../event/event_header.dart';
+// --- 1. IMPORT SERVICE NOTIFIKASI ---
+import '../../notification/notification_service.dart'; 
 
 class BookingScreen extends StatefulWidget {
   final RoomType room;
@@ -22,9 +24,8 @@ class _BookingScreenState extends State<BookingScreen> {
   final TextEditingController _guestNikController = TextEditingController();
   final TextEditingController _guestCountController = TextEditingController(text: "1");
   
-  // --- BARU: CONTROLLER PROMO ---
   final TextEditingController _promoController = TextEditingController();
-  double _discountAmount = 0; // Potongan dalam Rupiah
+  double _discountAmount = 0; 
   String _appliedPromoName = ""; 
 
   String _selectedPayment = "Transfer Bank"; 
@@ -36,7 +37,6 @@ class _BookingScreenState extends State<BookingScreen> {
     return days < 1 ? 1 : days; 
   }
 
-  // --- BARU: FUNGSI CEK PROMO ---
   void _handleCheckPromo() async {
     if (_promoController.text.isEmpty) return;
 
@@ -47,7 +47,6 @@ class _BookingScreenState extends State<BookingScreen> {
         _appliedPromoName = result['data']['nama_promo'];
         double potongan = double.parse(result['data']['nominal_potongan'].toString());
         
-        // Jika tipenya persen, kita hitung dari harga total
         if (result['data']['tipe_diskon'] == 'persen') {
           double currentTotal = _calculateNights() * widget.room.hargaAkhir;
           _discountAmount = currentTotal * (potongan / 100);
@@ -65,6 +64,7 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
+  // --- 2. LOGIKA BOOKING DENGAN TOKEN HP ASLI ---
   void _handleBooking() async {
     if (_checkInDate == null || _guestNameController.text.isEmpty || _guestNikController.text.isEmpty) {
       _showSnackBar("Harap isi semua data!", Colors.red);
@@ -72,18 +72,26 @@ class _BookingScreenState extends State<BookingScreen> {
     }
 
     setState(() => _isLoading = true);
+
+    // A. Ambil User ID dari memori
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     int? userId = prefs.getInt('user_id');
 
+    // B. AMBIL TOKEN HP ASLI DARI FIREBASE (Poin Penting!)
+    String? realFcmToken = await PushNotificationService.getDeviceToken();
+    print("DEBUG_FCM_TOKEN: $realFcmToken");
+
     double finalTotal = (_calculateNights() * widget.room.hargaAkhir) - _discountAmount;
 
+    // C. Menyusun data untuk dikirim ke Laravel Port 8001
     Map<String, dynamic> data = {
       "user_id": userId ?? 0,
+      "fcm_token": realFcmToken ?? "", // <--- MENGIRIM TOKEN ASLI
       "tipe_kamar_id": widget.room.id,
       "tgl_checkin": DateFormat('yyyy-MM-dd').format(_checkInDate!),
       "tgl_checkout": DateFormat('yyyy-MM-dd').format(_checkOutDate!),
       "total_malam": _calculateNights(),
-      "total_harga": finalTotal, // Kirim harga yang sudah dipotong diskon voucher
+      "total_harga": finalTotal, 
       "metode_pembayaran": _selectedPayment,
       "nama_tamu": _guestNameController.text,
       "nik_identitas": _guestNikController.text,
@@ -97,7 +105,12 @@ class _BookingScreenState extends State<BookingScreen> {
       final Uri url = Uri.parse(result['redirect_url']);
       await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (context) => WaitingPaymentScreen(reservasiId: result['reservasi_id'])));
+      Navigator.push(
+        context, 
+        MaterialPageRoute(builder: (context) => WaitingPaymentScreen(reservasiId: result['reservasi_id']))
+      );
+    } else {
+      _showSnackBar(result['message'] ?? "Gagal", Colors.red);
     }
   }
 
@@ -113,7 +126,12 @@ class _BookingScreenState extends State<BookingScreen> {
     double totalBayar = subTotal - _discountAmount;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Konfirmasi Pesanan"), backgroundColor: primaryColor, foregroundColor: Colors.white),
+      appBar: AppBar(
+        title: const Text("Konfirmasi Pesanan"), 
+        backgroundColor: primaryColor, 
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -130,11 +148,13 @@ class _BookingScreenState extends State<BookingScreen> {
                   _buildTextField(_guestNikController, "NIK / KTP", Icons.badge, primaryColor),
                   const SizedBox(height: 20),
 
-                  _buildSectionTitle("Jadwal"),
+                  _buildSectionTitle("Jadwal Menginap"),
+                  const SizedBox(height: 10),
                   ListTile(
-                    tileColor: Colors.grey[100],
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: BorderSide(color: Colors.grey[300]!)),
+                    tileColor: Colors.grey[50],
                     leading: Icon(Icons.date_range, color: primaryColor),
-                    title: Text(_checkInDate == null ? "Pilih Tanggal" : "${DateFormat('dd MMM').format(_checkInDate!)} - ${DateFormat('dd MMM yyyy').format(_checkOutDate!)}"),
+                    title: Text(_checkInDate == null ? "Klik untuk Pilih Tanggal" : "${DateFormat('dd MMM').format(_checkInDate!)} - ${DateFormat('dd MMM yyyy').format(_checkOutDate!)}"),
                     onTap: () async {
                       DateTimeRange? picked = await showDateRangePicker(context: context, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
                       if (picked != null) setState(() { _checkInDate = picked.start; _checkOutDate = picked.end; });
@@ -142,7 +162,6 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   const SizedBox(height: 25),
 
-                  // --- BOX INPUT PROMO (BARU) ---
                   _buildSectionTitle("Punya Kode Voucher?"),
                   const SizedBox(height: 10),
                   Row(
@@ -151,7 +170,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         child: TextField(
                           controller: _promoController,
                           decoration: InputDecoration(
-                            hintText: "Masukkan kode (Contoh: HOTELMURAH)",
+                            hintText: "Contoh: HOTELMURAH",
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
@@ -160,14 +179,14 @@ class _BookingScreenState extends State<BookingScreen> {
                       ElevatedButton(
                         onPressed: _handleCheckPromo,
                         style: ElevatedButton.styleFrom(backgroundColor: primaryColor, padding: const EdgeInsets.all(15)),
-                        child: const Text("CEK"),
+                        child: const Text("CEK", style: TextStyle(color: Colors.white)),
                       ),
                     ],
                   ),
                   if (_appliedPromoName.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8, left: 5),
-                      child: Text("✓ Promo '$_appliedPromoName' digunakan", style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                      child: Text("✓ Voucher '$_appliedPromoName' aktif", style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
 
                   const SizedBox(height: 30),
@@ -175,7 +194,11 @@ class _BookingScreenState extends State<BookingScreen> {
                   const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(15),
-                    decoration: BoxDecoration(color: primaryColor.withOpacity(0.05), borderRadius: BorderRadius.circular(10), border: Border.all(color: primaryColor.withOpacity(0.2))),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.05), 
+                      borderRadius: BorderRadius.circular(10), 
+                      border: Border.all(color: primaryColor.withOpacity(0.2))
+                    ),
                     child: Column(
                       children: [
                         _buildPriceRow("Harga ($nights Malam)", "Rp ${subTotal.toStringAsFixed(0)}"),
@@ -194,16 +217,17 @@ class _BookingScreenState extends State<BookingScreen> {
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))),
         child: _isLoading ? const Center(child: CircularProgressIndicator()) : ElevatedButton(
           onPressed: _handleBooking,
-          style: ElevatedButton.styleFrom(backgroundColor: primaryColor, padding: const EdgeInsets.all(18)),
-          child: const Text("KONFIRMASI & BAYAR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(backgroundColor: primaryColor, padding: const EdgeInsets.all(18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          child: const Text("KONFIRMASI & BAYAR SEKARANG", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) => Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold));
+  Widget _buildSectionTitle(String title) => Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold));
   
   Widget _buildTextField(TextEditingController controller, String label, IconData icon, Color color, {bool isNumber = false}) {
     return TextField(

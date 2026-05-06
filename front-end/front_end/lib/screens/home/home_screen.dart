@@ -8,9 +8,10 @@ import '../hotel/room_list_screen.dart';
 import '../hotel/reservation_history_screen.dart';
 import '../restoran/menu_list_screen.dart';
 import '../restoran/order_history_screen.dart';
-import '../restoran/cart_screen.dart'; // Import halaman Cart
+import '../restoran/cart_screen.dart'; 
 import '../user/profile_screen.dart';
 import '../event/event_header.dart';
+import '../notification/notification_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -69,49 +70,48 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Memantau status keranjang restoran secara global via Provider
     final cartProvider = context.watch<CartProvider>();
     final primaryColor = Theme.of(context).primaryColor;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Purnama Hotel & Resto"),
+        title: const Text("Purnama Hotel"),
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          // --- PERBAIKAN: IKON KERANJANG SEKARANG BISA DIKLIK ---
+          // --- 2. TOMBOL LONCENG NOTIFIKASI ---
+          IconButton(
+            icon: const Icon(Icons.notifications_none_rounded),
+            tooltip: "Notifikasi",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotificationScreen()),
+              );
+            },
+          ),
+
+          // --- TOMBOL KERANJANG ---
           Stack(
             alignment: Alignment.center,
             children: [
               IconButton(
                 icon: const Icon(Icons.shopping_cart_outlined),
                 onPressed: () {
-                  // Jika keranjang kosong, beri tahu user
-                  if (cartProvider.items.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Keranjang belanja Anda kosong")),
-                    );
-                  } else {
-                    // JIKA ADA ISI: Langsung pindah ke halaman Keranjang (Cart)
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const CartScreen()),
-                    );
-                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CartScreen()),
+                  );
                 },
               ),
-              // Badge angka jumlah item di keranjang
               if (cartProvider.totalItems > 0)
                 Positioned(
                   right: 8,
                   top: 8,
                   child: Container(
                     padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                    decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)),
                     constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                     child: Text(
                       '${cartProvider.totalItems}',
@@ -123,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           
+          // --- FOTO PROFIL ---
           GestureDetector(
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()))
@@ -138,9 +139,11 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+
+          // --- LOGOUT ---
           IconButton(
             onPressed: _handleLogout,
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, size: 20),
             tooltip: "Keluar",
           )
         ],

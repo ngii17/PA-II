@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // --- FUNGSI AJAIB: MENGUBAH TULISAN #HEX MENJADI WARNA FLUTTER ---
+  // --- FUNGSI : MENGUBAH TULISAN #HEX MENJADI WARNA FLUTTER ---
   static Color hexToColor(String hexString) {
     final buffer = StringBuffer();
     // Jika formatnya #FFFFFF (7 karakter) atau FFFFFF (6 karakter)

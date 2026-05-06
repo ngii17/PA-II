@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+
+    'notification' => [
+        'url' => env('NOTIFICATION_SERVICE_URL'),
+    ],
+
 ];

@@ -12,9 +12,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Izinkan Midtrans mengirim laporan ke sini tanpa diblokir satpam CSRF
         $middleware->validateCsrfTokens(except: [
-            'api/midtrans/callback',
+            'api/midtrans-callback',
             'api/midtrans/callback/resto'
         ]);
     })

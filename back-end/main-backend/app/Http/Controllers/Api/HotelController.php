@@ -7,15 +7,25 @@ use App\Models\hotel\TipeKamar;
 use App\Models\hotel\Promo;
 use App\Models\hotel\Reservasi;
 use App\Models\hotel\DetailReservasi;
-use App\Models\hotel\Kamar; // Sudah tersedia
+use App\Models\hotel\Kamar;
+use App\Services\NotificationClientService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Midtrans\Config;
 use Midtrans\Snap;
+use Illuminate\Support\Facades\Log; // <--- SUDAH BENAR
+
 
 class HotelController extends Controller
 {
+    /**
+     * 2. INJECT SERVICE VIA CONSTRUCTOR
+     */
+    public function __construct(protected NotificationClientService $notifService)
+    {
+    }
+
     /**
      * 1. AMBIL DAFTAR KAMAR & HITUNG PROMO OTOMATIS
      */
@@ -66,12 +76,13 @@ class HotelController extends Controller
     }
 
     /**
-     * 2. SIMPAN RESERVASI DENGAN LOGIKA CEK STOK (ANTI-OVERBOOKING)
+     * 2. SIMPAN RESERVASI DENGAN LOGIKA CEK STOK & SIMPAN FCM TOKEN
      */
     public function storeReservation(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'user_id'           => 'required',
+            'fcm_token'         => 'nullable|string', 
             'tipe_kamar_id'     => 'required|exists:tipe_kamar,id',
             'tgl_checkin'       => 'required|date|after_or_equal:today',
             'tgl_checkout'      => 'required|date|after:tgl_checkin',
@@ -111,6 +122,7 @@ class HotelController extends Controller
         try {
             $reservasi = Reservasi::create([
                 'user_id'            => $request->user_id,
+                'fcm_token'          => $request->fcm_token, 
                 'tipe_kamar_id'      => $request->tipe_kamar_id,
                 'tgl_checkin'        => $request->tgl_checkin,
                 'tgl_checkout'       => $request->tgl_checkout,
@@ -174,7 +186,7 @@ class HotelController extends Controller
     /**
      * 3. AMBIL RIWAYAT RESERVASI
      */
-public function getReservationHistory(Request $request)
+    public function getReservationHistory(Request $request)
     {
         $userId = $request->query('user_id');
 
@@ -191,7 +203,7 @@ public function getReservationHistory(Request $request)
             $data = $history->map(function ($res) {
                 return [
                     'id'                  => $res->id,
-                    'tipe_kamar_id'       => $res->tipe_kamar_id, // <--- INI WAJIB ADA AGAR FLUTTER BISA KIRIM ULASAN
+                    'tipe_kamar_id'       => $res->tipe_kamar_id, 
                     'tgl_checkin'         => $res->tgl_checkin,
                     'tgl_checkout'        => $res->tgl_checkout,
                     'total_malam'         => $res->total_malam,
@@ -210,8 +222,12 @@ public function getReservationHistory(Request $request)
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
     /**
-     * 4. WEBHOOK CALLBACK (Update Status & Assign Kamar Otomatis)
+     * 4. WEBHOOK CALLBACK (OTOMATIS KIRIM NOTIFIKASI)
+     */
+    /**
+     * 4. WEBHOOK CALLBACK (OTOMATIS KIRIM NOTIFIKASI HOTEL & RESTO)
      */
     public function handleCallback(Request $request)
     {
@@ -219,22 +235,42 @@ public function getReservationHistory(Request $request)
         $hashed = hash("sha512", $request->order_id . $request->status_code . $request->gross_amount . $serverKey);
 
         if ($hashed == $request->signature_key) {
-            $orderId = $request->order_id; // Contoh: INV-12-xxx atau RESTO-5-xxx
+            $orderId = $request->order_id; 
             $orderIdParts = explode('-', $orderId);
-            $prefix = $orderIdParts[0]; // Ambil kata depan (INV atau RESTO)
-            $actualId = $orderIdParts[1]; // Ambil ID asli-nya
+            $prefix = $orderIdParts[0]; 
+            $actualId = $orderIdParts[1];
 
-            // 1. JIKA INI TRANSAKSI HOTEL (INV)
+            // --- A. JIKA TRANSAKSI HOTEL (INV) ---
             if ($prefix == 'INV') {
-                $reservasi = \App\Models\hotel\Reservasi::find($actualId);
+                $reservasi = \App\Models\hotel\Reservasi::with('tipeKamar')->find($actualId);
+                
                 if ($reservasi) {
                     if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
-                        // Cari kamar kosong & tandai terisi (Logika yang kita buat kemarin)
+                        
                         $kamar = \App\Models\hotel\Kamar::where('tipe_kamar_id', $reservasi->tipe_kamar_id)
                                              ->where('status_kamar_id', 1)->first();
+                        
+                        // Update status lunas & penempatan kamar
+                        $reservasi->update([
+                            'status_reservasi_id' => 2, 
+                            'kamar_id' => $kamar ? $kamar->id : null
+                        ]);
+
                         if ($kamar) {
                             $kamar->update(['status_kamar_id' => 2]);
-                            $reservasi->update(['status_reservasi_id' => 2, 'kamar_id' => $kamar->id]);
+                        }
+
+                        // PICU NOTIFIKASI HOTEL
+                        try {
+                            $this->notifService->bookingConfirmed(
+                                $reservasi->fcm_token ?? 'no_token', 
+                                $reservasi->user_id,
+                                $reservasi->id, 
+                                $reservasi->tipeKamar->nama_tipe ?? 'Kamar', 
+                                $reservasi->tgl_checkin
+                            );
+                        } catch (\Exception $e) {
+                            Log::error("Gagal kirim notif hotel: " . $e->getMessage()); 
                         }
                     } else if (in_array($request->transaction_status, ['deny', 'expire', 'cancel'])) {
                         $reservasi->update(['status_reservasi_id' => 4]);
@@ -242,20 +278,36 @@ public function getReservationHistory(Request $request)
                 }
             } 
             
-            // 2. JIKA INI TRANSAKSI RESTORAN (RESTO)
-            else if ($prefix == 'RESTO') {
-                $pesanan = \App\Models\restoran\PesananMenu::find($actualId);
-                if ($pesanan) {
-                    if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
-                        $pesanan->update(['status_pembayaran_id' => 2]); // Lunas
-                    } else if (in_array($request->transaction_status, ['deny', 'expire', 'cancel'])) {
-                        $pesanan->update(['status_pembayaran_id' => 4]); // Batal
-                    }
-                }
+            // --- B. JIKA TRANSAKSI RESTORAN (RESTO) ---
+    // ... di dalam handleCallback ...
+else if ($prefix == 'RESTO') {
+    // Gunakan eager load jika perlu, tapi find saja cukup
+    $pesanan = \App\Models\restoran\PesananMenu::find($actualId);
+    
+    if ($pesanan) {
+        if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
+            $pesanan->update(['status_pembayaran_id' => 2]);
+
+            // PAKSA KIRIM NOTIFIKASI
+            try {
+                $this->notifService->orderConfirmed(
+                    $pesanan->fcm_token ?? 'TOKEN_KOSONG', 
+                    $pesanan->user_id, 
+                    $pesanan->id, 
+                    (float)$pesanan->total_harga
+                );
+            } catch (\Exception $e) {
+                Log::error("ERROR_NOTIF_RESTO: " . $e->getMessage());
             }
+        }
+    }
+
+
+}
         }
         return response()->json(['message' => 'OK']);
     }
+
 
     /**
      * 5. CEK STATUS

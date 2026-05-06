@@ -5,10 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiServices {
   // 1. Alamat Server Auth (Mikroservices - Port 8000)
-  static const String _authUrl = "http://10.106.22.132:8000/api";
+  static const String _authUrl = "http://10.223.75.132:8000/api";
   
   // 2. Alamat Server Bisnis (Main Backend - Port 8001)
-  static const String _hotelUrl = "http://10.106.22.132:8001/api";
+  static const String _hotelUrl = "http://10.223.75.132:8001/api";
+
+  // 3. Alamat Server Notifikasi (Port 8002)
+  static const String _notifUrl = "http://10.223.75.132:8002/api";
 
   // ==========================================
   // FUNGSI KHUSUS HOTEL (Server Port 8001)
@@ -436,6 +439,33 @@ class ApiServices {
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Gagal mengecek promo: $e'};
+    }
+  }
+
+
+   // 19. FUNGSI AMBIL INBOX NOTIFIKASI (Dari Port 8002)
+  static Future<Map<String, dynamic>> getNotificationInbox(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse("$_notifUrl/inbox/$userId"),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+
+      // Kita gunakan handleResponse yang kita buat kemarin untuk debug
+      if (response.body.startsWith('<')) {
+         print("ERROR_HTML: ${response.body}");
+         return {'success': false, 'message': 'Server Notif Error'};
+      }
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {
+        'success': false, 
+        'message': 'Gagal terhubung ke pusat notifikasi: $e'
+      };
     }
   }
 

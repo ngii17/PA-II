@@ -6,6 +6,7 @@ import '../../services/api_services.dart';
 import '../../providers/cart_provider.dart'; // Tambahkan ini
 import 'menu_resto.dart';
 import 'waiting_payment_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // <--- Tambahkan ini
 
 class CheckoutScreen extends StatefulWidget {
   final Map<int, int> cart;
@@ -73,29 +74,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       int? userId = prefs.getInt('user_id');
 
+      // --- TAMBAHAN: Ambil Token FCM dari Firebase ---
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      print("FCM Token Anda: $fcmToken"); // Untuk debugging di console
+
       List<Map<String, dynamic>> items = [];
       widget.cart.forEach((id, qty) => items.add({"menu_id": id, "jumlah": qty}));
 
       // Kirim data ke Laravel
       final result = await ApiServices.placeRestaurantOrder({
         "user_id": userId ?? 1,
+        "fcm_token": fcmToken, // <--- SEKARANG TOKEN SUDAH TERKIRIM
         "metode_pembayaran": _paymentMethod,
         "total_harga": _getSubtotal() - _discount,
         "items": items
       });
 
       if (result['success'] == true) {
-        // --- 1. KOSONGKAN KERANJANG DI PROVIDER (Penting!) ---
         if (mounted) {
           context.read<CartProvider>().clearCart();
         }
 
-        // --- 2. LOGIKA ARAHAN PEMBAYARAN ---
         if (_paymentMethod != "Bayar di Kasir") {
           String? redirectUrl = result['redirect_url'];
-          int? orderId = result['data'] != null ? result['data']['order_id'] : result['order_id'];
+          
+          // Perbaikan pengambilan orderId agar lebih aman
+          int? orderId;
+          if (result['data'] != null && result['data']['order_id'] != null) {
+            orderId = result['data']['order_id'];
+          } else {
+            orderId = result['order_id'];
+          }
 
-          if (redirectUrl != null) {
+          if (redirectUrl != null && orderId != null) {
             await launchUrl(Uri.parse(redirectUrl), mode: LaunchMode.externalApplication);
             if (!mounted) return;
             Navigator.push(context, MaterialPageRoute(builder: (context) => WaitingPaymentScreen(orderId: orderId!)));
@@ -104,7 +115,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _showSuccessCashDialog();
         }
       } else {
-        // --- 3. TAMPILKAN ERROR JIKA GAGAL (Misal: Stok Habis) ---
         _showSnackBar(result['message'] ?? "Gagal memproses pesanan", Colors.red);
       }
     } catch (e) {
