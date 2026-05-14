@@ -2,16 +2,30 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Untuk rootBundle (baca file asset)
+import 'package:image_picker/image_picker.dart'; // Untuk ambil gambar dari galeri/kamera
+import 'package:firebase_messaging/firebase_messaging.dart';
+import  'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../notification/notification_service.dart'; // Import service notifikasi untuk ambil token
+import '../screens/event/app_theme.dart'; // Import AppTheme untuk konversi warna
+import '../screens/notification/notification_screen.dart'; // Import Screen Notifikasi untuk navigas
+import 'package:url_launcher/url_launcher.dart'; // Untuk buka URL eksternal (redirect pembayaran) 
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+
+
+
 
 class ApiServices {
   // 1. Alamat Server Auth (Mikroservices - Port 8000)
-  static const String _authUrl = "http://10.223.75.132:8000/api";
+  static const String _authUrl = "http://10.187.82.132:8000/api";
   
   // 2. Alamat Server Bisnis (Main Backend - Port 8001)
-  static const String _hotelUrl = "http://10.223.75.132:8001/api";
+  static const String _hotelUrl = "http://10.187.82.132:8001/api";
 
   // 3. Alamat Server Notifikasi (Port 8002)
-  static const String _notifUrl = "http://10.223.75.132:8002/api";
+  static const String _notifUrl = "http://10.187.82.132:8002/api";
 
   // ==========================================
   // FUNGSI KHUSUS HOTEL (Server Port 8001)
@@ -91,18 +105,34 @@ class ApiServices {
     }
   }
 
-  static Future<Map<String, dynamic>> login(String email, String password) async {
-    try {
-      final response = await http.post(
-        Uri.parse("$_authUrl/login"), 
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
-      );
-      return jsonDecode(response.body);
-    } catch (e) {
-      return {'success': false, 'message': 'Koneksi gagal: $e'};
+static Future<Map<String, dynamic>> login(String email, String password) async {
+  try {
+    String? fcmToken = await FirebaseMessaging.instance.getToken();
+    
+    final response = await http.post(
+      Uri.parse("$_authUrl/login"),
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        'fcm_token': fcmToken
+      }),
+    );
+
+    var data = jsonDecode(response.body);
+    
+    if (data['success'] == true) {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      // SIMPAN WAKTU LOGIN SEKARANG (dalam milidetik)
+      int loginTime = DateTime.now().millisecondsSinceEpoch;
+      await prefs.setInt('last_login_time', loginTime);
     }
+
+    return data;
+  } catch (e) {
+    return {'success': false, 'message': 'Koneksi gagal: $e'};
   }
+}
 
   // 6. FUNGSI SIMPAN RESERVASI (Mengirim ke Main Backend - Port 8001)
   static Future<Map<String, dynamic>> storeReservation(Map<String, dynamic> data) async {
@@ -468,5 +498,43 @@ class ApiServices {
       };
     }
   }
+
+
+   // 20. FUNGSI AMBIL PROMO (Gunakan _baseUrl karena ini di Port 8001)
+  static Future<Map<String, dynamic>> getActivePromo() async {
+    try {
+      final response = await http.get(
+        Uri.parse("$_hotelUrl/resto/active-promo"), // <-- Sekarang _baseUrl sudah dikenal
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+
+
+  // Detail Notifikasi
+static Future<Map<String, dynamic>> getNotificationDetail(int id, int userId) async {
+  final response = await http.get(Uri.parse("$_notifUrl/notifications/$id?user_id=$userId"));
+  return jsonDecode(response.body);
+}
+
+// Tandai Dibaca
+static Future<void> markNotifAsRead(int id, int userId) async {
+  await http.patch(Uri.parse("$_notifUrl/notifications/$id/read?user_id=$userId"));
+}
+
+// Hapus Notifikasi
+static Future<Map<String, dynamic>> deleteNotification(int id, int userId) async {
+  final response = await http.delete(Uri.parse("$_notifUrl/notifications/$id?user_id=$userId"));
+  return jsonDecode(response.body);
+}
+
+
 
 }

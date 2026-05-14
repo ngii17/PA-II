@@ -23,6 +23,9 @@ Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 
+Route::get('/internal/user-tokens', [AuthController::class, 'getAllUserTokens']);
+
+
 // Route yang WAJIB LOGIN (Dijaga Satpam Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
     

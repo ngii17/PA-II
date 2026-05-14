@@ -6,34 +6,26 @@ use Illuminate\Database\Eloquent\Model;
 
 class Reservasi extends Model
 {
-    // Nama tabel di database pgAdmin
     protected $table = 'reservasi';
 
-    // Daftar kolom yang diizinkan untuk diisi secara massal
     protected $fillable = [
-        'user_id',
-        'tipe_kamar_id',
-        'kamar_id',
-        'fcm_token',           // <--- TAMBAHAN: Untuk menyimpan identitas HP User
-        'tgl_checkin',
-        'tgl_checkout',
-        'total_malam',
-        'total_harga',
-        'metode_pembayaran',
-        'status_reservasi_id',
-        'snap_token',
+        'user_id', 'fcm_token', 'tipe_kamar_id', 'kamar_id', 
+        'tgl_checkin', 'tgl_checkout', 'total_malam', 
+        'total_harga', 'metode_pembayaran', 'status_reservasi_id', 
+        'snap_token', 'deposit_amount', 'confirmed_by', 'confirmed_at'
     ];
 
     /**
-     * RELASI: Satu reservasi memiliki banyak data tamu
+     * RELASI: Satu Reservasi terhubung ke satu unit Kamar fisik
      */
-    public function details()
+    public function kamar()
     {
-        return $this->hasMany(DetailReservasi::class, 'reservasi_id');
+        // Hubungkan ke model Kamar menggunakan kolom 'kamar_id'
+        return $this->belongsTo(Kamar::class, 'kamar_id');
     }
 
     /**
-     * RELASI: Reservasi ini memesan tipe kamar tertentu
+     * RELASI: Satu Reservasi terhubung ke satu Tipe Kamar
      */
     public function tipeKamar()
     {
@@ -41,10 +33,10 @@ class Reservasi extends Model
     }
 
     /**
-     * RELASI: Nomor kamar fisik yang didapatkan (diisi setelah bayar)
+     * RELASI: Detail Tamu
      */
-    public function kamarFisik()
+    public function details()
     {
-        return $this->belongsTo(Kamar::class, 'kamar_id');
+        return $this->hasMany(DetailReservasi::class, 'reservasi_id');
     }
 }

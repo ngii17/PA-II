@@ -113,4 +113,76 @@ class NotificationClientService
         'total_bayar'=> $totalHarga,
     ]);
 }
+
+/**
+     * Notifikasi Pesanan Restoran Siap Disajikan
+     */
+    public function orderReady($fcmToken, $userId, $orderId)
+    {
+        return $this->post('order-ready', [
+            'fcm_token' => $fcmToken,
+            'user_id'   => $userId,
+            'order_id'  => $orderId,
+        ]);
+    }
+
+    /**
+     * Notifikasi Pesanan Restoran Dibatalkan
+     */
+    public function orderCancelled($fcmToken, $userId, $orderId)
+    {
+        return $this->post('order-cancelled', [
+            'fcm_token' => $fcmToken,
+            'user_id'   => $userId,
+            'order_id'  => $orderId,
+        ]);
+    }
+
+    public function broadcastPromo($tokens, $title, $body)
+    {
+        return $this->post('broadcast', [
+            'tokens' => $tokens, // Mengirimkan Array
+            'title'  => $title,
+            'body'   => $body,
+        ]);
+    }
+
+    /**
+     * Kirim Notifikasi Massal (Broadcast) ke Port 8002
+     */
+    public function massSend($data)
+    {
+        // Pastikan endpoint-nya sesuai dengan yang ada di Port 8002
+        // Berdasarkan route:list kamu sebelumnya, prefix-nya adalah 'notify'
+        return $this->post('broadcast/send', $data);
+    }
+
+
+    /**
+     * Notifikasi Check-in Berhasil
+     */
+    public function sendCheckinSuccess($fcmToken, $userId, $roomNumber)
+    {
+        // Fungsi ini memanggil 'post' yang private (karena masih satu class, ini dibolehkan)
+        return $this->post('hotel/checkin-success', [
+            'fcm_token'   => $fcmToken,
+            'user_id'     => $userId,
+            'room_number' => $roomNumber,
+        ]);
+    }
+
+
+
+    /**
+     * Notifikasi Check-out Berhasil
+     */
+    public function sendCheckoutSuccess($fcmToken, $userId, $reservationId)
+    {
+        return $this->post('hotel/checkout-success', [
+            'fcm_token'      => $fcmToken,
+            'user_id'        => $userId,
+            'reservation_id' => $reservationId,
+        ]);
+    }
+    
 }

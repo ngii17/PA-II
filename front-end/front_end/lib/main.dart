@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // Tambahkan ini
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Tambahkan ini
 
 // --- IMPORT PROVIDERS ---
 import 'providers/event_provider.dart';
@@ -11,10 +12,10 @@ import 'providers/cart_provider.dart';
 import 'notification/notification_service.dart';
 import 'screens/event/app_theme.dart';
 import 'screens/user/login_screen.dart';
-import 'screens/notification/notification_screen.dart'; // Import Screen Notifikasi
+import 'screens/home/home_screen.dart'; // Pastikan path home_screen benar
+import 'screens/notification/notification_screen.dart';
 
 // 1. GLOBAL NAVIGATOR KEY
-// Ini kunci agar kita bisa pindah halaman dari mana saja tanpa BuildContext
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
@@ -22,13 +23,8 @@ void main() async {
 
   try {
     await Firebase.initializeApp();
-    
-    // Inisialisasi service dasar
     await PushNotificationService.initialize();
-
-    // 2. LOGIKA KLIK NOTIFIKASI (Background & Terminated)
     setupNotificationInteractions();
-    
     print("LOG_NOTIFICATION: Firebase & Interaction Handler Berhasil");
   } catch (e) {
     print("LOG_ERROR: Gagal inisialisasi Firebase: $e");
@@ -45,22 +41,17 @@ void main() async {
   );
 }
 
-// 3. FUNGSI UNTUK MENANGANI KLIK NOTIFIKASI
 void setupNotificationInteractions() async {
-  // A. Jika aplikasi mati total (Terminated) lalu diklik
   RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   if (initialMessage != null) {
     _navigateToNotificationScreen();
   }
-
-  // B. Jika aplikasi ada di background (tidak mati total) lalu diklik
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     _navigateToNotificationScreen();
   });
 }
 
 void _navigateToNotificationScreen() {
-  // Menggunakan navigatorKey untuk pindah ke NotificationScreen
   navigatorKey.currentState?.push(
     MaterialPageRoute(builder: (context) => const NotificationScreen()),
   );
@@ -69,18 +60,28 @@ void _navigateToNotificationScreen() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // Fungsi untuk memperbarui waktu aktivitas terakhir ke SharedPreferences
+  void _updateLastActivity() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    // Simpan timestamp milidetik saat ini
+    await prefs.setInt('last_activity', DateTime.now().millisecondsSinceEpoch);
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventProvider = context.watch<EventProvider>();
 
-    return MaterialApp(
-      navigatorKey: navigatorKey, // <--- 4. PASANG NAVIGATOR KEY DI SINI
-      title: 'Purnama Hotel & Resto',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.getTheme(eventProvider.activeTheme),
-      
-      // Definisikan rute jika diperlukan, tapi kita gunakan push manual di atas
-      home: const SplashScreenProxy(),
+    return Listener(
+      // --- PELACAK AKTIVITAS OTOMATIS ---
+      // Setiap kali ada sentuhan di layar manapun, waktu aktivitas diperbarui
+      onPointerDown: (_) => _updateLastActivity(),
+      child: MaterialApp(
+        navigatorKey: navigatorKey,
+        title: 'Purnama Hotel & Resto',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.getTheme(eventProvider.activeTheme),
+        home: const SplashScreenProxy(),
+      ),
     );
   }
 }
@@ -97,21 +98,71 @@ class _SplashScreenProxyState extends State<SplashScreenProxy> {
   void initState() {
     super.initState();
     
+    // 1. Ambil tema dari database
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<EventProvider>().fetchActiveTheme();
       }
     });
     
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        // Gunakan pushReplacement agar splash screen hilang dari stack
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
+    // 2. Cek Sesi User
+    _checkSession();
+  }
+
+  void _checkSession() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    
+    // Ambil Token dan Waktu Aktivitas Terakhir
+    String? token = prefs.getString('access_token');
+    int? lastActivity = prefs.getInt('last_activity');
+
+    // Beri jeda 2 detik untuk Splash Screen
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (token == null) {
+      // Jika belum login sama sekali
+      _goToLogin();
+      return;
+    }
+
+    if (lastActivity != null) {
+      int now = DateTime.now().millisecondsSinceEpoch;
+      int difference = now - lastActivity;
+      
+      // 30 Menit = 30 * 60 * 1000 milidetik = 1.800.000
+      const int timeoutLimit = 30 * 60 * 1000;
+
+      if (difference > timeoutLimit) {
+        // --- SESI HABIS ---
+        print("LOG_SESSION: Sesi Kadaluwarsa. Menghapus data login...");
+        await prefs.clear(); // Hapus token agar harus login ulang
+        _goToLogin();
+        return;
       }
-    });
+    }
+
+    // --- SESI MASIH BERLAKU ---
+    // Update waktu aktivitas sekarang agar 10 menit mulai dihitung dari saat ini
+    await prefs.setInt('last_activity', DateTime.now().millisecondsSinceEpoch);
+    _goToHome();
+  }
+
+  void _goToLogin() {
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    }
+  }
+
+  void _goToHome() {
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    }
   }
 
   @override

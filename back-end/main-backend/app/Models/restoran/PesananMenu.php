@@ -12,11 +12,13 @@ class PesananMenu extends Model
     // Daftar kolom yang boleh diisi secara massal
 protected $fillable = [
     'user_id',
-    'fcm_token', // <--- Pastikan baris ini ada
+    'fcm_token',
     'total_harga',
     'metode_pembayaran',
     'snap_token',
     'status_pembayaran_id',
+    'tipe_pengantaran', // <--- TAMBAHKAN INI (meja / kamar)
+    'nomor_lokasi',    // <--- TAMBAHKAN INI (no meja / no kamar)
 ];
 
     /**

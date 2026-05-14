@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_services.dart';
+import 'package:flutter/material.dart';
 
 class EventProvider extends ChangeNotifier {
   // 1. Variabel penampung seluruh data tema dari Laravel
@@ -33,4 +34,31 @@ class EventProvider extends ChangeNotifier {
       print("LOG_ERROR_THEME: $e");
     }
   }
+
+
+  // Tambahkan getter untuk Primary Color
+  Color get primaryColor {
+    if (activeTheme != null && activeTheme['primary_color'] != null) {
+      return _parseHexColor(activeTheme['primary_color']);
+    }
+    return const Color(0xFF1B5E20); // Fallback warna hijau jika data null
+  }
+
+  // Tambahkan getter untuk Secondary Color
+  Color get secondaryColor {
+    if (activeTheme != null && activeTheme['secondary_color'] != null) {
+      return _parseHexColor(activeTheme['secondary_color']);
+    }
+    return const Color(0xFFFDD835); // Fallback warna kuning jika data null
+  }
+
+  // Fungsi pembantu untuk mengubah String Hex ke Color Flutter
+  Color _parseHexColor(String hexString) {
+    final buffer = StringBuffer();
+    if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
+    buffer.write(hexString.replaceFirst('#', ''));
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
+
+  
 }

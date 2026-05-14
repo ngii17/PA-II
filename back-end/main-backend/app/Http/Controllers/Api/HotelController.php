@@ -28,14 +28,17 @@ class HotelController extends Controller
 
     /**
      * 1. AMBIL DAFTAR KAMAR & HITUNG PROMO OTOMATIS
+     * (Versi Sinkron dengan Fitur Saklar is_active)
      */
     public function getRoomTypes()
     {
         try {
             $tipeKamar = TipeKamar::all();
 
+            // --- PERBAIKAN: Ditambahkan pengecekan is_active ---
             $promoAktif = Promo::where('kategori', 'hotel')
-                ->whereNull('kode_promo')
+                ->where('is_active', true) // <--- Hanya ambil jika saklar aktif (true)
+                ->whereNull('kode_promo') // Hanya promo otomatis (tanpa kode)
                 ->whereDate('tgl_mulai', '<=', now())
                 ->whereDate('tgl_selesai', '>=', now())
                 ->first();
@@ -45,6 +48,7 @@ class HotelController extends Controller
                 $hargaAkhir = $hargaAsli;
                 $infoPromo = null;
 
+                // Hitung potongan harga HANYA JIKA promo ditemukan (is_active == true)
                 if ($promoAktif) {
                     $potongan = ($promoAktif->tipe_diskon == 'persen') 
                         ? $hargaAsli * ($promoAktif->nominal_potongan / 100) 
@@ -58,13 +62,13 @@ class HotelController extends Controller
                 }
 
                 return [
-                    'id' => $item->id,
-                    'nama_tipe' => $item->nama_tipe,
-                    'harga_asli' => $hargaAsli,
+                    'id'          => $item->id,
+                    'nama_tipe'   => $item->nama_tipe,
+                    'harga_asli'  => $hargaAsli,
                     'harga_akhir' => $hargaAkhir,
-                    'kapasitas' => $item->kapasitas,
-                    'fasilitas' => $item->fasilitas,
-                    'deskripsi' => $item->deskripsi,
+                    'kapasitas'   => $item->kapasitas,
+                    'fasilitas'   => $item->fasilitas,
+                    'deskripsi'   => $item->deskripsi,
                     'promo_aktif' => $infoPromo,
                 ];
             });
@@ -328,4 +332,139 @@ else if ($prefix == 'RESTO') {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+
+
+    /**
+     * 6. STAFF HOTEL: KONFIRMASI CHECK-IN
+     * Alur: Cari Kamar Kosong -> Update Status Reservasi (3) -> Kunci Kamar (2) -> Kirim Notif
+     */
+    public function confirmCheckIn(Request $request, $id)
+    {
+        // 1. Validasi Input Staff
+        $validator = Validator::make($request->all(), [
+            'staff_id' => 'required|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            // 2. Cari data reservasi
+            $reservasi = \App\Models\hotel\Reservasi::find($id);
+
+            if (!$reservasi) {
+                return response()->json(['success' => false, 'message' => 'Data reservasi tidak ditemukan.'], 404);
+            }
+
+            // Keamanan: Cek apakah sudah check-in sebelumnya?
+            if ($reservasi->status_reservasi_id == 3) {
+                return response()->json(['success' => false, 'message' => 'Tamu ini sudah berstatus Check-in.'], 400);
+            }
+
+            // 3. Cari unit kamar fisik yang masih status 1 (Tersedia) sesuai tipe yang dipesan
+            $kamarTersedia = \App\Models\hotel\Kamar::where('tipe_kamar_id', $reservasi->tipe_kamar_id)
+                                  ->where('status_kamar_id', 1)
+                                  ->first();
+
+            if (!$kamarTersedia) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Maaf, tidak ada unit kamar fisik yang kosong untuk tipe ini.'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // 4. Update data Reservasi: Status jadi 3 (Check-in), Pasang ID Kamar, Set Deposit
+            $reservasi->update([
+                'status_reservasi_id' => 3, 
+                'kamar_id'            => $kamarTersedia->id,
+                'deposit_amount'      => 100000.00, // Deposit otomatis sistem
+                'confirmed_at'        => now(),
+                'confirmed_by'        => $request->staff_id
+            ]);
+
+            // 5. Update status unit Kamar fisik menjadi 2 (Terisi/Occupied)
+            $kamarTersedia->update(['status_kamar_id' => 2]);
+
+            DB::commit();
+
+            // 6. PICU NOTIFIKASI "SELAMAT MENIKMATI" KE HP USER (Port 8002)
+            try {
+                $this->notifService->sendCheckinSuccess(
+                    $reservasi->fcm_token ?? 'no_token',
+                    $reservasi->user_id,
+                    $kamarTersedia->nomor_kamar
+                );
+            } catch (\Exception $e) {
+                Log::error("Gagal kirim notif checkin: " . $e->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Proses Check-in Berhasil!',
+                'data' => [
+                    'nomor_kamar' => $kamarTersedia->nomor_kamar,
+                    'nama_tamu'   => $reservasi->details[0]->nama_tamu ?? 'Tamu',
+                    'deposit'     => "Rp 100.000 (Tercatat)",
+                    'status'      => 'SUDAH CHECK-IN'
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['success' => false, 'message' => 'Internal Server Error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * 7. STAFF HOTEL: KONFIRMASI CHECK-OUT
+     */
+    public function confirmCheckOut($id)
+    {
+        try {
+            // Cari reservasi beserta data kamar fisiknya
+            $reservasi = Reservasi::with('kamar')->find($id);
+            if (!$reservasi) return response()->json(['success' => false, 'message' => 'Data tidak ditemukan'], 404);
+
+            DB::beginTransaction();
+
+            // 1. Ubah status Kamar Fisik kembali ke 1 (Tersedia)
+            if ($reservasi->kamar) {
+                $reservasi->kamar->update(['status_kamar_id' => 1]);
+            }
+
+            // 2. Update status reservasi menjadi SELESAI (ID 4)
+            $reservasi->update(['status_reservasi_id' => 4]);
+
+            DB::commit();
+
+            // 3. PICU NOTIFIKASI CHECK-OUT
+            try {
+                $this->notifService->sendCheckoutSuccess(
+                    $reservasi->fcm_token ?? 'no_token',
+                    $reservasi->user_id,
+                    $reservasi->id
+                );
+            } catch (\Exception $e) {
+                Log::error("Gagal kirim notif checkout: " . $e->getMessage());
+            }
+
+            return response()->json([
+                'success' => true, 
+                'message' => 'Check-out berhasil. Kamar kini tersedia kembali.'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+
+    
+
+
 }

@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart'; 
 import 'waiting_payment_screen.dart'; 
 import '../event/event_header.dart';
-// --- 1. IMPORT SERVICE NOTIFIKASI ---
 import '../../notification/notification_service.dart'; 
 
 class BookingScreen extends StatefulWidget {
@@ -28,6 +27,7 @@ class _BookingScreenState extends State<BookingScreen> {
   double _discountAmount = 0; 
   String _appliedPromoName = ""; 
 
+  // --- PILIHAN METODE PEMBAYARAN ---
   String _selectedPayment = "Transfer Bank"; 
   bool _isLoading = false;
 
@@ -64,7 +64,6 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  // --- 2. LOGIKA BOOKING DENGAN TOKEN HP ASLI ---
   void _handleBooking() async {
     if (_checkInDate == null || _guestNameController.text.isEmpty || _guestNikController.text.isEmpty) {
       _showSnackBar("Harap isi semua data!", Colors.red);
@@ -73,20 +72,17 @@ class _BookingScreenState extends State<BookingScreen> {
 
     setState(() => _isLoading = true);
 
-    // A. Ambil User ID dari memori
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     int? userId = prefs.getInt('user_id');
 
-    // B. AMBIL TOKEN HP ASLI DARI FIREBASE (Poin Penting!)
+    // Ambil Token FCM
     String? realFcmToken = await PushNotificationService.getDeviceToken();
-    print("DEBUG_FCM_TOKEN: $realFcmToken");
 
     double finalTotal = (_calculateNights() * widget.room.hargaAkhir) - _discountAmount;
 
-    // C. Menyusun data untuk dikirim ke Laravel Port 8001
     Map<String, dynamic> data = {
       "user_id": userId ?? 0,
-      "fcm_token": realFcmToken ?? "", // <--- MENGIRIM TOKEN ASLI
+      "fcm_token": realFcmToken ?? "", 
       "tipe_kamar_id": widget.room.id,
       "tgl_checkin": DateFormat('yyyy-MM-dd').format(_checkInDate!),
       "tgl_checkout": DateFormat('yyyy-MM-dd').format(_checkOutDate!),
@@ -102,16 +98,42 @@ class _BookingScreenState extends State<BookingScreen> {
     setState(() => _isLoading = false);
 
     if (result['success'] == true) {
-      final Uri url = Uri.parse(result['redirect_url']);
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-      if (!mounted) return;
-      Navigator.push(
-        context, 
-        MaterialPageRoute(builder: (context) => WaitingPaymentScreen(reservasiId: result['reservasi_id']))
-      );
+      // --- LOGIKA JIKA BAYAR ONLINE ---
+      if (_selectedPayment != "Bayar di Kasir") {
+        String? redirectUrl = result['redirect_url'];
+        if (redirectUrl != null) {
+          await launchUrl(Uri.parse(redirectUrl), mode: LaunchMode.externalApplication);
+          if (!mounted) return;
+          Navigator.push(
+            context, 
+            MaterialPageRoute(builder: (context) => WaitingPaymentScreen(reservasiId: result['reservasi_id']))
+          );
+        }
+      } 
+      // --- LOGIKA JIKA BAYAR DI KASIR / FRONT DESK ---
+      else {
+        _showSuccessDialog("Booking Berhasil! Silakan selesaikan pembayaran dan proses Check-in di Front Desk saat tiba di hotel.");
+      }
     } else {
-      _showSnackBar(result['message'] ?? "Gagal", Colors.red);
+      _showSnackBar(result['message'] ?? "Gagal memproses booking", Colors.red);
     }
+  }
+
+  void _showSuccessDialog(String msg) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text("Berhasil"),
+        content: Text(msg),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+            child: const Text("OK"),
+          )
+        ],
+      )
+    );
   }
 
   void _showSnackBar(String msg, Color color) {
@@ -162,6 +184,28 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   const SizedBox(height: 25),
 
+                  // --- PILIHAN PEMBAYARAN ---
+                  _buildSectionTitle("Metode Pembayaran"),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: _selectedPayment,
+                        items: ["Transfer Bank", "E-Wallet", "Bayar di Kasir"]
+                            .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                            .toList(),
+                        onChanged: (v) => setState(() => _selectedPayment = v!),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 25),
+
                   _buildSectionTitle("Punya Kode Voucher?"),
                   const SizedBox(height: 10),
                   Row(
@@ -183,12 +227,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       ),
                     ],
                   ),
-                  if (_appliedPromoName.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8, left: 5),
-                      child: Text("✓ Voucher '$_appliedPromoName' aktif", style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-
+                  
                   const SizedBox(height: 30),
                   _buildSectionTitle("Rincian Biaya"),
                   const SizedBox(height: 10),
@@ -221,7 +260,7 @@ class _BookingScreenState extends State<BookingScreen> {
         child: _isLoading ? const Center(child: CircularProgressIndicator()) : ElevatedButton(
           onPressed: _handleBooking,
           style: ElevatedButton.styleFrom(backgroundColor: primaryColor, padding: const EdgeInsets.all(18), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-          child: const Text("KONFIRMASI & BAYAR SEKARANG", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+          child: const Text("KONFIRMASI & BOOKING SEKARANG", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         ),
       ),
     );
