@@ -309,26 +309,4 @@ public function login(Request $request)
         ], 200);
     }
 
-    /**
-     * 11. AMBIL SEMUA USER (Untuk Dashboard Admin)
-     * Mengambil seluruh data user (Admin, Staff, Customer)
-     */
-    public function getAllUsers()
-    {
-        try {
-            // Mengambil semua data dari tabel users
-            $users = User::all();
-
-            return response()->json([
-                'success' => true,
-                'data'    => $users
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil data user: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
 }

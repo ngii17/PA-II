@@ -258,10 +258,10 @@ class RestoranController extends Controller
         }
 
         try {
-            // PERBAIKAN: Tambahkan closure pada with untuk memanggil withTrashed()
-            $history = PesananMenu::with(['details.menu' => function ($query) {
-                    $query->withTrashed();
-                }])
+            // 2. Ambil riwayat beserta detail menu
+            // Laravel otomatis menyertakan tipe_pengantaran & nomor_lokasi
+            // selama kolom tersebut ada di database dan didaftarkan di $fillable Model
+            $history = PesananMenu::with(['details.menu'])
                 ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -273,10 +273,7 @@ class RestoranController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal memuat riwayat: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -325,9 +322,14 @@ class RestoranController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memuat riwayat: ' . $e->getMessage()
+            ], 500);
         }
     }
+
+
 
     /**
      * Helper untuk mempermudah pembacaan response (Opsional)
