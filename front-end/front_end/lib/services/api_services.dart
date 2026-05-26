@@ -522,4 +522,42 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
+
+   // 20. FUNGSI AMBIL PROMO (Gunakan _baseUrl karena ini di Port 8001)
+  static Future<Map<String, dynamic>> getActivePromo() async {
+    try {
+      final response = await http.get(
+        Uri.parse("$_hotelUrl/resto/active-promo"), // <-- Sekarang _baseUrl sudah dikenal
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+
+
+  // Detail Notifikasi
+static Future<Map<String, dynamic>> getNotificationDetail(int id, int userId) async {
+  final response = await http.get(Uri.parse("$_notifUrl/notifications/$id?user_id=$userId"));
+  return jsonDecode(response.body);
+}
+
+// Tandai Dibaca
+static Future<void> markNotifAsRead(int id, int userId) async {
+  await http.patch(Uri.parse("$_notifUrl/notifications/$id/read?user_id=$userId"));
+}
+
+// Hapus Notifikasi
+static Future<Map<String, dynamic>> deleteNotification(int id, int userId) async {
+  final response = await http.delete(Uri.parse("$_notifUrl/notifications/$id?user_id=$userId"));
+  return jsonDecode(response.body);
+}
+
+
+
 }

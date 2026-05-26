@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
-import '../event/event_header.dart'; // Import Header Event
+import '../event/event_header.dart';
 
 class OrderDetailScreen extends StatelessWidget {
   final Map<String, dynamic> order;
@@ -86,7 +86,9 @@ class OrderDetailScreen extends StatelessWidget {
                   );
                 }
               },
-              child: isSending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text("Kirim"),
+              child: isSending 
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+                : const Text("Kirim"),
             ),
           ],
         ),
@@ -99,10 +101,15 @@ class OrderDetailScreen extends StatelessWidget {
     final primaryColor = Theme.of(context).primaryColor;
     final List<dynamic> details = order['details'] ?? [];
 
-    // Logika Status Pembayaran (ID 2 = Lunas)
+    // Logika Status Pembayaran
     bool isPaid = order['status_pembayaran_id'].toString() == '2';
     Color statusColor = isPaid ? Colors.green : Colors.orange;
     String statusText = isPaid ? "SUDAH DIBAYAR" : "MENUNGGU PEMBAYARAN";
+
+    // --- LOGIKA LOKASI PENGANTARAN ---
+    String deliveryType = order['tipe_pengantaran'] ?? "Meja";
+    String locationNum = order['nomor_lokasi'] ?? "-";
+    IconData locationIcon = deliveryType == "Kamar" ? Icons.bed : Icons.table_restaurant;
 
     return Scaffold(
       appBar: AppBar(
@@ -119,7 +126,7 @@ class OrderDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header Status
+                  // --- HEADER STATUS & LOKASI ---
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -141,6 +148,23 @@ class OrderDetailScreen extends StatelessWidget {
                           statusText,
                           style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
                         ),
+                        const Divider(height: 30),
+                        // --- INFO LOKASI ANTAR ---
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(locationIcon, size: 20, color: primaryColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Lokasi Antar: $deliveryType $locationNum",
+                              style: TextStyle(
+                                fontSize: 15, 
+                                fontWeight: FontWeight.w600, 
+                                color: primaryColor
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -149,7 +173,7 @@ class OrderDetailScreen extends StatelessWidget {
                   const Text("Pesanan Anda:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
 
-                  // --- DAFTAR MENU DENGAN TOMBOL ULASAN ---
+                  // --- DAFTAR MENU ---
                   Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -166,8 +190,6 @@ class OrderDetailScreen extends StatelessWidget {
                         return ListTile(
                           title: Text(menuName, style: const TextStyle(fontWeight: FontWeight.w600)),
                           subtitle: Text("${item['jumlah']} porsi x Rp ${double.parse(item['harga_at_porsi'].toString()).toStringAsFixed(0)}"),
-                          
-                          // --- PERBAIKAN: Tombol Ulas ditaruh di sini ---
                           trailing: isPaid 
                             ? ElevatedButton(
                                 onPressed: () => _showRestoReviewDialog(context, menuId, menuName),
@@ -201,7 +223,9 @@ class OrderDetailScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         _buildInfoRow("Metode Pembayaran", order['metode_pembayaran'] ?? "-"),
-                        _buildInfoRow("Waktu Pesan", order['created_at'].toString().substring(0, 16)),
+                        _buildInfoRow("Waktu Pesan", order['created_at'].toString().substring(0, 16).replaceAll('T', ' ')),
+                        _buildInfoRow("Tipe Pengantaran", deliveryType),
+                        _buildInfoRow("No. Meja/Kamar", locationNum),
                         const Divider(),
                         _buildInfoRow(
                           "Total Bayar", 
@@ -227,12 +251,12 @@ class OrderDetailScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
           Text(
             value, 
             style: TextStyle(
               fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-              fontSize: isBold ? 18 : 14,
+              fontSize: isBold ? 18 : 13,
               color: color,
             )
           ),

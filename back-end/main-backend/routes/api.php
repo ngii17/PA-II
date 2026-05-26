@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\UlasanController;
 use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\PromoController;
 use App\Services\NotificationClientService;
+use App\Http\Controllers\Api\AdminController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -62,16 +64,18 @@ Route::get('/active-event', [EventController::class, 'getActiveEvent']);
 Route::post('/promo/check', [PromoController::class, 'checkPromo']);
 
 
-Route::get('/test-notif-resto-ke-8002', function() {
-    $notif = app(\App\Services\NotificationClientService::class);
-    // Masukkan token asli kamu di sini (bisa ambil dari tabel reservasi hotel yang sukses)
-    $tokenAsli = "MASUKKAN_TOKEN_ASLI_DARI_PGADMIN_DI_SINI"; 
-    
-    $res = $notif->orderConfirmed(
-        $tokenAsli, 
-        1, 
-        77, // ID pesanan bohongan
-        50000 // Harga bohongan
-    );
-    return response()->json($res);
-});
+// Tambahkan ini di dalam routes/api.php
+
+Route::post('/resto/update-status/{id}', [RestoranController::class, 'updateStatus']);
+
+Route::get('/resto/active-promo', [RestoranController::class, 'getActivePublicPromo']);
+
+Route::post('/admin/broadcast', [AdminController::class, 'broadcastToAll']);
+
+// Rute untuk diakses aplikasi Staff Restoran
+Route::post('/resto/confirm-payment/{id}', [RestoranController::class, 'confirmPaymentByStaff']);
+
+
+Route::post('/hotel/confirm-checkin/{id}', [HotelController::class, 'confirmCheckIn']);
+Route::post('/hotel/confirm-checkout/{id}', [HotelController::class, 'confirmCheckOut']);
+

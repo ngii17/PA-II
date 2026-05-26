@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Tambahkan ini
+import 'package:provider/provider.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_services.dart';
-import '../../providers/cart_provider.dart'; // Tambahkan ini
+import '../../providers/cart_provider.dart'; 
 import 'menu_resto.dart';
 import 'waiting_payment_screen.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // <--- Tambahkan ini
+import 'package:firebase_messaging/firebase_messaging.dart'; 
 
 class CheckoutScreen extends StatefulWidget {
   final Map<int, int> cart;
@@ -20,6 +20,11 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _paymentMethod = "Transfer Bank";
+  
+  // --- TAMBAHAN STATE UNTUK LOKASI ---
+  String _deliveryType = "Meja"; // Default antar ke Meja
+  final TextEditingController _locationController = TextEditingController();
+  
   final TextEditingController _promoController = TextEditingController();
   double _discount = 0;
   String _promoName = "";
@@ -64,8 +69,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  // --- PERBAIKAN FUNGSI BAYAR ---
   void _payNow() async {
+    // --- VALIDASI LOKASI ---
+    if (_locationController.text.isEmpty) {
+      _showSnackBar("Mohon isi nomor $_deliveryType Anda", Colors.orange);
+      return;
+    }
+
     if (_isProcessing) return;
 
     setState(() => _isProcessing = true);
@@ -74,19 +84,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       int? userId = prefs.getInt('user_id');
 
-      // --- TAMBAHAN: Ambil Token FCM dari Firebase ---
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
-      print("FCM Token Anda: $fcmToken"); // Untuk debugging di console
+      // Ambil Token FCM dengan proteksi try-catch (antisipasi Service Not Available)
+      String? fcmToken;
+      try {
+        fcmToken = await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 5));
+      } catch (e) {
+        print("LOG_ERROR: Gagal ambil token: $e");
+      }
 
       List<Map<String, dynamic>> items = [];
       widget.cart.forEach((id, qty) => items.add({"menu_id": id, "jumlah": qty}));
 
-      // Kirim data ke Laravel
+      // Kirim data ke Laravel (Sudah ditambah Lokasi)
       final result = await ApiServices.placeRestaurantOrder({
         "user_id": userId ?? 1,
-        "fcm_token": fcmToken, // <--- SEKARANG TOKEN SUDAH TERKIRIM
+        "fcm_token": fcmToken,
         "metode_pembayaran": _paymentMethod,
         "total_harga": _getSubtotal() - _discount,
+        "tipe_pengantaran": _deliveryType,    // <--- DATA BARU
+        "nomor_lokasi": _locationController.text, // <--- DATA BARU
         "items": items
       });
 
@@ -97,8 +113,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         if (_paymentMethod != "Bayar di Kasir") {
           String? redirectUrl = result['redirect_url'];
-          
-          // Perbaikan pengambilan orderId agar lebih aman
           int? orderId;
           if (result['data'] != null && result['data']['order_id'] != null) {
             orderId = result['data']['order_id'];
@@ -181,16 +195,68 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 );
               },
             ),
-            const Divider(height: 30),
             
-            const Text("Metode Pembayaran", style: TextStyle(fontWeight: FontWeight.bold)),
-            DropdownButton<String>(
-              isExpanded: true,
-              value: _paymentMethod,
-              items: ["Transfer Bank", "E-Wallet", "Bayar di Kasir"].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-              onChanged: (v) => setState(() => _paymentMethod = v!),
+            // ==========================================
+            // --- BAGIAN BARU: LOKASI PENGANTARAN ---
+            // ==========================================
+            const Divider(height: 40),
+            const Text("Lokasi Pengantaran", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: const Text("Meja"),
+                    value: "Meja",
+                    groupValue: _deliveryType,
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: primaryColor,
+                    onChanged: (v) => setState(() => _deliveryType = v!),
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<String>(
+                    title: const Text("Kamar"),
+                    value: "Kamar",
+                    groupValue: _deliveryType,
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: primaryColor,
+                    onChanged: (v) => setState(() => _deliveryType = v!),
+                  ),
+                ),
+              ],
+            ),
+            TextField(
+              controller: _locationController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Nomor $_deliveryType Anda",
+                hintText: "Contoh: 05",
+                prefixIcon: Icon(_deliveryType == "Meja" ? Icons.table_restaurant : Icons.bed),
+                border: const OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: primaryColor)),
+              ),
             ),
             const SizedBox(height: 20),
+            // ==========================================
+
+            // --- PADA BAGIAN BUILD METODE PEMBAYARAN ---
+const Text("Metode Pembayaran", style: TextStyle(fontWeight: FontWeight.bold)),
+DropdownButton<String>(
+  isExpanded: true,
+  value: _paymentMethod,
+  // LOGIKA FILTER: Jika Kamar, hilangkan opsi 'Bayar di Kasir'
+  items: [
+    "Transfer Bank", 
+    "E-Wallet", 
+    if (_deliveryType == "Meja") "Bayar di Kasir" // Hanya muncul jika Dine-in (Meja)
+  ].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+  onChanged: (v) {
+    setState(() {
+      _paymentMethod = v!;
+    });
+  },
+),const SizedBox(height: 20),
 
             const Text("Punya Kode Promo?", style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
@@ -203,7 +269,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                ElevatedButton(onPressed: _checkPromo, child: const Text("CEK")),
+                ElevatedButton(
+                  onPressed: _checkPromo,
+                  style: ElevatedButton.styleFrom(backgroundColor: primaryColor, foregroundColor: Colors.white),
+                  child: const Text("CEK"),
+                ),
               ],
             ),
             

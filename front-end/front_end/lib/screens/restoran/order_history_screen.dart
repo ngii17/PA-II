@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
 import 'order_detail_screen.dart';
-import '../event/event_header.dart'; // <--- IMPORT HEADER EVENT
+import '../event/event_header.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   const OrderHistoryScreen({super.key});
@@ -28,13 +28,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // KUNCI: Mengambil warna tema aktif
     final primaryColor = Theme.of(context).primaryColor;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Riwayat Makan"),
-        backgroundColor: primaryColor, // Ikuti tema
+        backgroundColor: primaryColor,
         foregroundColor: Colors.white,
       ),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -52,9 +51,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
           return Column(
             children: [
-              // --- 1. BANNER EVENT DI ATAS DAFTAR RIWAYAT ---
               const EventHeader(),
-
               if (history.isEmpty)
                 const Expanded(
                   child: Center(child: Text("Anda belum pernah memesan makanan.")),
@@ -68,13 +65,20 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                       final order = history[index];
                       final List<dynamic> details = order['details'] ?? [];
 
-                      // Logika Status Pembayaran
+                      // --- LOGIKA STATUS ---
                       Color statusColor = order['status_pembayaran_id'] == 2
                           ? Colors.green
                           : Colors.orange;
                       String statusText = order['status_pembayaran_id'] == 2
                           ? "LUNAS"
                           : "PENDING";
+
+                      // --- LOGIKA LOKASI PENGANTARAN ---
+                      String deliveryType = order['tipe_pengantaran'] ?? "Meja";
+                      String locationNum = order['nomor_lokasi'] ?? "-";
+                      IconData locationIcon = deliveryType == "Kamar" 
+                          ? Icons.bed 
+                          : Icons.table_restaurant;
 
                       return InkWell(
                         onTap: () {
@@ -122,7 +126,25 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                     ),
                                   ],
                                 ),
-                                const Divider(height: 20),
+                                const SizedBox(height: 10),
+                                
+                                // --- INFO LOKASI PENGANTARAN (BARU) ---
+                                Row(
+                                  children: [
+                                    Icon(locationIcon, size: 16, color: primaryColor),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      "Diantar ke: $deliveryType $locationNum",
+                                      style: TextStyle(
+                                        fontSize: 13, 
+                                        fontWeight: FontWeight.w500,
+                                        color: primaryColor
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                const Divider(height: 25),
 
                                 // Ringkasan item makanan
                                 Column(
@@ -144,7 +166,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                   }).toList(),
                                 ),
 
-                                const Divider(height: 20),
+                                const Divider(height: 25),
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -157,7 +179,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                       style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
-                                          color: primaryColor), // Ikuti Tema
+                                          color: primaryColor),
                                     ),
                                   ],
                                 ),
@@ -175,7 +197,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                       "Lihat Detail >",
                                       style: TextStyle(
                                           fontSize: 10,
-                                          color: primaryColor, // Ikuti Tema
+                                          color: primaryColor,
                                           fontWeight: FontWeight.bold),
                                     ),
                                   ],

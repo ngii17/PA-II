@@ -29,14 +29,17 @@ class HotelController extends Controller
 
     /**
      * 1. AMBIL DAFTAR KAMAR & HITUNG PROMO OTOMATIS
+     * (Versi Sinkron dengan Fitur Saklar is_active)
      */
     public function getRoomTypes()
     {
         try {
             $tipeKamar = TipeKamar::all();
 
+            // --- PERBAIKAN: Ditambahkan pengecekan is_active ---
             $promoAktif = Promo::where('kategori', 'hotel')
-                ->whereNull('kode_promo')
+                ->where('is_active', true) // <--- Hanya ambil jika saklar aktif (true)
+                ->whereNull('kode_promo') // Hanya promo otomatis (tanpa kode)
                 ->whereDate('tgl_mulai', '<=', now())
                 ->whereDate('tgl_selesai', '>=', now())
                 ->first();
@@ -46,6 +49,7 @@ class HotelController extends Controller
                 $hargaAkhir = $hargaAsli;
                 $infoPromo = null;
 
+                // Hitung potongan harga HANYA JIKA promo ditemukan (is_active == true)
                 if ($promoAktif) {
                     $potongan = ($promoAktif->tipe_diskon == 'persen')
                         ? $hargaAsli * ($promoAktif->nominal_potongan / 100)
@@ -59,13 +63,13 @@ class HotelController extends Controller
                 }
 
                 return [
-                    'id' => $item->id,
-                    'nama_tipe' => $item->nama_tipe,
-                    'harga_asli' => $hargaAsli,
+                    'id'          => $item->id,
+                    'nama_tipe'   => $item->nama_tipe,
+                    'harga_asli'  => $hargaAsli,
                     'harga_akhir' => $hargaAkhir,
-                    'kapasitas' => $item->kapasitas,
-                    'fasilitas' => $item->fasilitas,
-                    'deskripsi' => $item->deskripsi,
+                    'kapasitas'   => $item->kapasitas,
+                    'fasilitas'   => $item->fasilitas,
+                    'deskripsi'   => $item->deskripsi,
                     'promo_aktif' => $infoPromo,
                 ];
             });
@@ -386,7 +390,7 @@ else if ($prefix == 'RESTO') {
 
             if (!$kamarTersedia) {
                 return response()->json([
-                    'success' => false,
+                    'success' => false, 
                     'message' => 'Maaf, tidak ada unit kamar fisik yang kosong untuk tipe ini.'
                 ], 400);
             }
@@ -395,7 +399,7 @@ else if ($prefix == 'RESTO') {
 
             // 4. Update data Reservasi: Status jadi 3 (Check-in), Pasang ID Kamar, Set Deposit
             $reservasi->update([
-                'status_reservasi_id' => 3,
+                'status_reservasi_id' => 3, 
                 'kamar_id'            => $kamarTersedia->id,
                 'deposit_amount'      => 100000.00, // Deposit otomatis sistem
                 'confirmed_at'        => now(),
@@ -469,7 +473,7 @@ else if ($prefix == 'RESTO') {
             }
 
             return response()->json([
-                'success' => true,
+                'success' => true, 
                 'message' => 'Check-out berhasil. Kamar kini tersedia kembali.'
             ]);
 
@@ -480,7 +484,7 @@ else if ($prefix == 'RESTO') {
     }
 
 
-
+    
 
 
 }

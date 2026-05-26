@@ -27,6 +27,7 @@ protected $fillable = [
     'role_id',
     'otp',
     'is_verified',
+    'fcm_token',
 ];
 
     /**

@@ -7,45 +7,37 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Reservasi extends Model
 {
-    use SoftDeletes;
-
     protected $table = 'reservasi';
 
-    // Daftar kolom yang diizinkan untuk diisi secara massal
     protected $fillable = [
-        'user_id',
-        'tipe_kamar_id',
-        'kamar_id',
-        'tgl_checkin',
-        'tgl_checkout',
-        'total_malam',
-        'total_harga',
-        'metode_pembayaran',
-        'status_reservasi_id',
-        'snap_token',
+        'user_id', 'fcm_token', 'tipe_kamar_id', 'kamar_id', 
+        'tgl_checkin', 'tgl_checkout', 'total_malam', 
+        'total_harga', 'metode_pembayaran', 'status_reservasi_id', 
+        'snap_token', 'deposit_amount', 'confirmed_by', 'confirmed_at'
     ];
 
     /**
-     * TAMBAHKAN RELASI INI (WAJIB)
-     * Agar data Nama Tamu & NIK dari tabel detail_reservasi bisa terbaca
+     * RELASI: Satu Reservasi terhubung ke satu unit Kamar fisik
      */
-    public function kamarFisik()
+    public function kamar()
     {
+        // Hubungkan ke model Kamar menggunakan kolom 'kamar_id'
         return $this->belongsTo(Kamar::class, 'kamar_id');
     }
 
-    public function statusReservasi()
-    {
-        return $this->belongsTo(StatusReservasi::class, 'status_reservasi_id');
-    }
-
+    /**
+     * RELASI: Satu Reservasi terhubung ke satu Tipe Kamar
+     */
     public function tipeKamar()
     {
         return $this->belongsTo(TipeKamar::class, 'tipe_kamar_id');
     }
 
-    public function kamar()
+    /**
+     * RELASI: Detail Tamu
+     */
+    public function details()
     {
-        return $this->belongsTo(Kamar::class, 'kamar_id');
+        return $this->hasMany(DetailReservasi::class, 'reservasi_id');
     }
 }

@@ -113,19 +113,27 @@ class AuthController extends Controller
     /**
      * 3. LOGIN
      */
-    public function login(Request $request)
+public function login(Request $request)
     {
         // 1. Tambahkan fcm_token dalam validasi (nullable agar tidak error jika testing tanpa token)
         $request->validate([
-            'email' => 'required|email',
+            'email' => 'required|email', 
             'password' => 'required',
-            'fcm_token' => 'nullable|string'
+            'fcm_token' => 'nullable|string' 
         ]);
 
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['success' => false, 'message' => 'Email atau Password salah.'], 401);
+        }
+
+        // --- 2. UPDATE FCM TOKEN USER DISINI ---
+        // Setiap kali login, kita simpan token HP terbaru agar alamat broadcast tidak basi
+        if ($request->has('fcm_token') && $request->fcm_token != null) {
+            $user->update([
+                'fcm_token' => $request->fcm_token
+            ]);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -136,7 +144,6 @@ class AuthController extends Controller
             'user'         => $user
         ], 200);
     }
-
     /**
      * 4. FORGOT PASSWORD
      */
@@ -301,27 +308,5 @@ class AuthController extends Controller
             'data'    => $users
         ], 200);
     }
-
-    /**
-     * 11. AMBIL SEMUA USER (Untuk Dashboard Admin)
-     * Mengambil seluruh data user (Admin, Staff, Customer)
-     */
-    public function getAllUsers()
-    {
-        try {
-            // Mengambil semua data dari tabel users
-            $users = User::all();
-
-            return response()->json([
-                'success' => true,
-                'data'    => $users
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil data user: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
+    
 }
