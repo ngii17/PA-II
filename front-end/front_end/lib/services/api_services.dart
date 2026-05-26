@@ -176,23 +176,24 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-  // 8. FUNGSI AMBIL RIWAYAT RESERVASI (Dari Port 8001)
+  // ==========================================================
+  // 2. PERBAIKAN RIWAYAT RESERVASI (Tambahkan Header Token)
+  // ==========================================================
   static Future<Map<String, dynamic>> getReservationHistory(String userId) async {
     try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('auth_token');
+
       final response = await http.get(
         Uri.parse("$_hotelUrl/reservasi/history?user_id=$userId"),
         headers: {
-          'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': 'Bearer $token', // Tambahkan ini
         },
       );
-
       return jsonDecode(response.body);
     } catch (e) {
-      return {
-        'success': false, 
-        'message': 'Gagal mengambil riwayat: $e'
-      };
+      return {'success': false, 'message': 'Gagal mengambil riwayat: $e'};
     }
   }
 
@@ -278,14 +279,19 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-  // 12. Fungsi untuk mengambil riwayat pesanan restoran (Dari Port 8001)
+  // ==========================================================
+  // 3. PERBAIKAN RIWAYAT MAKAN (Tambahkan Header Token)
+  // ==========================================================
   static Future<Map<String, dynamic>> getRestaurantOrderHistory(String userId) async {
     try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('auth_token');
+
       final response = await http.get(
         Uri.parse("$_hotelUrl/menus/order/history?user_id=$userId"),
         headers: {
-          'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': 'Bearer $token', // Tambahkan ini
         },
       );
       return jsonDecode(response.body);
@@ -293,6 +299,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
       return {'success': false, 'message': 'Gagal mengambil riwayat resto: $e'};
     }
   }
+
 
   // 13. Fungsi untuk mengambil data profil lengkap user (Dari Port 8000)
   static Future<Map<String, dynamic>> getUserProfile() async {
@@ -387,12 +394,21 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
   // FUNGSI KHUSUS ULASAN (Server Port 8001)
   // ==========================================
 
-  // 13. Kirim Ulasan Hotel
+  // ==========================================================
+  // 4. PERBAIKAN KIRIM ULASAN (Wajib Pakai Token)
+  // ==========================================================
   static Future<Map<String, dynamic>> storeHotelReview(Map<String, dynamic> data) async {
     try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('auth_token');
+
       final response = await http.post(
         Uri.parse("$_hotelUrl/review/hotel"),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json', 
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token', // Tambahkan ini
+        },
         body: jsonEncode(data),
       );
       return jsonDecode(response.body);
@@ -404,9 +420,16 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
   // 14. Kirim Ulasan Restoran
   static Future<Map<String, dynamic>> storeRestoReview(Map<String, dynamic> data) async {
     try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('auth_token');
+
       final response = await http.post(
         Uri.parse("$_hotelUrl/review/restoran"),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode(data),
       );
       return jsonDecode(response.body);

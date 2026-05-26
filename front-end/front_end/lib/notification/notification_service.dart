@@ -25,7 +25,7 @@ class PushNotificationService {
 
     // --- PERBAIKAN: Menggunakan label 'settings' sesuai permintaan VS Code kamu ---
     await _localNotifications.initialize(
-      settings: initSettings,
+      initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         if (response.payload != null) {
           Map<String, dynamic> data = jsonDecode(response.payload!);
@@ -61,10 +61,10 @@ class PushNotificationService {
 
     // --- PERBAIKAN: Menggunakan label lengkap agar tidak error 'positional arguments' ---
     _localNotifications.show(
-      id: DateTime.now().millisecond, 
-      title: message.notification?.title ?? "Purnama Hotel",
-      body: message.notification?.body ?? "",
-      notificationDetails: platformDetail,
+      DateTime.now().millisecond,
+      message.notification?.title ?? "Purnama Hotel",
+      message.notification?.body ?? "",
+      platformDetail,
       payload: jsonEncode(message.data),
     );
   }

@@ -3,10 +3,13 @@
 namespace App\Models\Hotel;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Promo extends Model
 {
-    protected $table = 'promo';    
+    use SoftDeletes;
+
+    protected $table = 'promo';
 protected $fillable = [
     'nama_promo',
     'kode_promo',

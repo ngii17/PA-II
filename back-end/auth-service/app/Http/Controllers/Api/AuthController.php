@@ -53,7 +53,7 @@ class AuthController extends Controller
             'username'  => $request->username,
             'full_name' => $request->full_name,
             'email'     => $request->email,
-            'password'  => Hash::make($request->password), 
+            'password'  => Hash::make($request->password),
             'phone'     => $request->phone,
             'address'   => $request->address,
             'otp'       => $otp
@@ -101,7 +101,7 @@ class AuthController extends Controller
             'password'    => $cachedData['password'],
             'phone'       => $cachedData['phone'],
             'address'     => $cachedData['address'],
-            'role_id'     => 2, 
+            'role_id'     => 2,
             'is_verified' => true,
         ]);
 
@@ -117,9 +117,9 @@ public function login(Request $request)
     {
         // 1. Tambahkan fcm_token dalam validasi (nullable agar tidak error jika testing tanpa token)
         $request->validate([
-            'email' => 'required|email', 
+            'email' => 'required|email',
             'password' => 'required',
-            'fcm_token' => 'nullable|string' 
+            'fcm_token' => 'nullable|string'
         ]);
 
         $user = User::where('email', $request->email)->first();
@@ -212,10 +212,10 @@ public function login(Request $request)
     public function profile(Request $request)
     {
         $user = $request->user();
-        
+
         // Kita gunakan url('/') agar link mengarah ke IP Laptop kamu, bukan localhost
-        $photoUrl = $user->profile_photo 
-            ? url('storage/profiles/' . $user->profile_photo) 
+        $photoUrl = $user->profile_photo
+            ? url('storage/profiles/' . $user->profile_photo)
             : "https://ui-avatars.com/api/?name=" . urlencode($user->full_name) . "&background=0D8ABC&color=fff";
 
         return response()->json([
@@ -308,5 +308,27 @@ public function login(Request $request)
             'data'    => $users
         ], 200);
     }
-    
+
+    /**
+     * 11. AMBIL SEMUA USER (Untuk Dashboard Admin)
+     * Mengambil seluruh data user (Admin, Staff, Customer)
+     */
+    public function getAllUsers()
+    {
+        try {
+            // Mengambil semua data dari tabel users
+            $users = User::all();
+
+            return response()->json([
+                'success' => true,
+                'data'    => $users
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data user: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
 }

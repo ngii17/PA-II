@@ -5,9 +5,12 @@ namespace App\Models\restoran;
 use Illuminate\Database\Eloquent\Model;
 // Import Model Event agar bisa dikenali
 use App\Models\event\Event;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Menu extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'menu';
 
     protected $fillable = [

@@ -37,13 +37,13 @@ class RestoranController extends Controller
             $activeEvent = Event::where('is_active', true)->first();
 
             // 2. LOGIKA FILTER (Poin permintaanmu):
-            
+
             // JIKA TEMA 'DEFAULT' (Bukan Hari Besar)
             if (!$activeEvent || $activeEvent->event_code == 'default') {
                 // Ambil SEMUA menu tanpa terkecuali
                 $menus = Menu::with(['kategori', 'status'])->get();
-            } 
-            
+            }
+
             // JIKA TEMA HARI BESAR AKTIF (HUT RI, Valentine, dll)
             else {
                 // HANYA ambil menu yang didaftarkan (punya relasi) ke event tersebut
@@ -74,11 +74,11 @@ class RestoranController extends Controller
         // 1. Validasi Input (Ditambahkan tipe_pengantaran dan nomor_lokasi)
         $validator = Validator::make($request->all(), [
             'user_id'           => 'required',
-            'fcm_token'         => 'nullable|string', 
+            'fcm_token'         => 'nullable|string',
             'metode_pembayaran' => 'required|string',
             'tipe_pengantaran'  => 'required|string', // 'Meja' atau 'Kamar'
             'nomor_lokasi'      => 'required|string',    // Nomor meja/kamarnya
-            'items'             => 'required|array', 
+            'items'             => 'required|array',
             'items.*.menu_id'   => 'required|exists:menu,id',
             'items.*.jumlah'    => 'required|integer|min:1',
         ]);
@@ -143,8 +143,8 @@ class RestoranController extends Controller
                 Config::$isSanitized = true;
                 Config::$is3ds = true;
 
-                $enabledPayments = ($request->metode_pembayaran == 'Transfer Bank') 
-                    ? ['bank_transfer'] 
+                $enabledPayments = ($request->metode_pembayaran == 'Transfer Bank')
+                    ? ['bank_transfer']
                     : ['gopay', 'shopeepay', 'qris'];
 
                 $params = [
@@ -174,7 +174,7 @@ class RestoranController extends Controller
                 'message'      => 'Pesanan berhasil dibuat!',
                 'snap_token'   => $snapToken,
                 'redirect_url' => $redirectUrl,
-                'data'         => [ 
+                'data'         => [
                     'order_id'    => $pesanan->id,
                     'total_bayar' => $totalHarga,
                     'lokasi'      => $request->tipe_pengantaran . ' ' . $request->nomor_lokasi
@@ -184,7 +184,7 @@ class RestoranController extends Controller
         } catch (\Exception $e) {
             DB::rollback();
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'Gagal memproses pesanan: ' . $e->getMessage()
             ], 500);
         }
@@ -218,9 +218,9 @@ class RestoranController extends Controller
 
             if ($pesanan) {
                 if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
-                    $pesanan->update(['status_pembayaran_id' => 2]); 
+                    $pesanan->update(['status_pembayaran_id' => 2]);
                 } else if (in_array($request->transaction_status, ['deny', 'expire', 'cancel'])) {
-                    $pesanan->update(['status_pembayaran_id' => 4]); 
+                    $pesanan->update(['status_pembayaran_id' => 4]);
                 }
             }
         }
@@ -238,7 +238,7 @@ class RestoranController extends Controller
 
         return response()->json([
             'success' => true,
-            'status_bayar_id' => (int) $pesanan->status_pembayaran_id, 
+            'status_bayar_id' => (int) $pesanan->status_pembayaran_id,
         ]);
     }
 
@@ -252,16 +252,16 @@ class RestoranController extends Controller
 
         if (!$userId) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'User ID tidak ditemukan.'
             ], 400);
         }
 
         try {
-            // 2. Ambil riwayat beserta detail menu
-            // Laravel otomatis menyertakan tipe_pengantaran & nomor_lokasi 
-            // selama kolom tersebut ada di database dan didaftarkan di $fillable Model
-            $history = PesananMenu::with(['details.menu'])
+            // PERBAIKAN: Tambahkan closure pada with untuk memanggil withTrashed()
+            $history = PesananMenu::with(['details.menu' => function ($query) {
+                    $query->withTrashed();
+                }])
                 ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -271,10 +271,10 @@ class RestoranController extends Controller
                 'message' => 'Riwayat pesanan berhasil dimuat.',
                 'data'    => $history
             ], 200);
-            
+
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'Gagal memuat riwayat: ' . $e->getMessage()
             ], 500);
         }
@@ -287,7 +287,7 @@ class RestoranController extends Controller
     {
         // Validasi: Hanya menerima ID 1, 2, 3, atau 4
         $validator = Validator::make($request->all(), [
-            'status_pesanan_id' => 'required|integer|in:1,2,3,4', 
+            'status_pesanan_id' => 'required|integer|in:1,2,3,4',
         ]);
 
         if ($validator->fails()) {
@@ -304,16 +304,16 @@ class RestoranController extends Controller
 
             // Update status di database (Pastikan nama kolom di tabel pesanan_menu sesuai)
             $pesanan->update([
-                'status_pesanan_id' => $request->status_pesanan_id 
+                'status_pesanan_id' => $request->status_pesanan_id
             ]);
 
             // --- LOGIKA PEMICU NOTIFIKASI ---
-            
+
             // HANYA jika status berubah menjadi 3 (Disajikan)
             if ($request->status_pesanan_id == 3) {
                 $this->notifService->orderReady(
-                    $pesanan->fcm_token ?? 'no_token', 
-                    $pesanan->user_id, 
+                    $pesanan->fcm_token ?? 'no_token',
+                    $pesanan->user_id,
                     $pesanan->id
                 );
             }
@@ -362,9 +362,9 @@ class RestoranController extends Controller
             if (!$promo) {
                 // Gunakan \Log agar tidak error "Undefined Type Log"
                 Log::info("Promo Resto Pop-up: Tidak ditemukan promo aktif untuk tanggal $today");
-                
+
                 return response()->json([
-                    'success' => false, 
+                    'success' => false,
                     'message' => 'Tidak ada promo aktif'
                 ], 404);
             }
@@ -381,13 +381,12 @@ class RestoranController extends Controller
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => 'Gagal mengambil promo: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    
 
     /**
      * KONFIRMASI PEMBAYARAN OLEH STAFF RESTORAN (KASIR)
@@ -420,9 +419,9 @@ class RestoranController extends Controller
             // 3. KIRIM NOTIFIKASI KE USER (Bahwa pembayaran sukses)
             try {
                 $this->notifService->orderConfirmed(
-                    $pesanan->fcm_token ?? 'no_token', 
-                    $pesanan->user_id, 
-                    $pesanan->id, 
+                    $pesanan->fcm_token ?? 'no_token',
+                    $pesanan->user_id,
+                    $pesanan->id,
                     (float)$pesanan->total_harga
                 );
             } catch (\Exception $e) {

@@ -28,15 +28,17 @@ Route::get('/internal/user-tokens', [AuthController::class, 'getAllUserTokens'])
 
 // Route yang WAJIB LOGIN (Dijaga Satpam Sanctum)
 Route::middleware('auth:sanctum')->group(function () {
-    
+
     // 1. Alamat untuk ambil data profil (Langkah 2 Profil)
     Route::get('/user/profile', [AuthController::class, 'profile']);
-    
+
     // TAMBAHKAN INI (Gunakan POST karena kita akan kirim file/gambar)
     Route::post('/user/update', [AuthController::class, 'updateProfile']);
     Route::delete('/user/delete-photo', [AuthController::class, 'deletePhoto']);
 
     // 2. Alamat untuk logout (Yang sudah kita buat kemarin)
     Route::post('/logout', [AuthController::class, 'logout']);
-    
+
+    // 3. Alamat untuk ambil semua user
+    Route::get('/users', [AuthController::class, 'getAllUsers']);
 });
