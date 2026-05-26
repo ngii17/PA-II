@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
-import '../event/event_header.dart'; // <--- IMPORT HEADER
+import '../event/event_header.dart'; 
+import '../../colors/login_constants.dart';
+import '../../widgets/login_widgets.dart';
 
 class ReservationDetailScreen extends StatelessWidget {
   final Map<String, dynamic> reservation;
 
   const ReservationDetailScreen({super.key, required this.reservation});
 
+  // ──────────────────────────────────────────────────────────────────────────
+  //  FUNGSI POP-UP ULASAN (MODERN & PREMIUM)
+  // ──────────────────────────────────────────────────────────────────────────
   void _showReviewDialog(BuildContext context) {
     final TextEditingController commentController = TextEditingController();
     int selectedRating = 5;
@@ -18,43 +23,71 @@ class ReservationDetailScreen extends StatelessWidget {
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: const Text("Beri Ulasan Kamar"),
-          content: SingleChildScrollView( // Agar tidak overflow saat keyboard muncul
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          title: const Text("Beri Ulasan Kamar", 
+            textAlign: TextAlign.center, 
+            style: TextStyle(fontWeight: FontWeight.bold)
+          ),
+          content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text("Bagaimana pengalaman menginap Anda?", textAlign: TextAlign.center),
-                const SizedBox(height: 15),
+                const Text("Bagaimana pengalaman menginap Anda?", 
+                  textAlign: TextAlign.center, 
+                  style: TextStyle(color: Colors.grey, fontSize: 13)
+                ),
+                const SizedBox(height: 20),
+                // Bintang Interaktif Navy-Gold
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
-                    return IconButton(
-                      icon: Icon(
-                        index < selectedRating ? Icons.star : Icons.star_border,
-                        color: Colors.amber, size: 30,
+                    return GestureDetector(
+                      onTap: isSending ? null : () => setStateDialog(() => selectedRating = index + 1),
+                      child: Icon(
+                        index < selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
+                        color: AppTheme.goldAccent, 
+                        size: 42,
                       ),
-                      onPressed: isSending ? null : () => setStateDialog(() => selectedRating = index + 1),
                     );
                   }),
                 ),
-                TextField(
-                  controller: commentController,
-                  maxLines: 3,
-                  enabled: !isSending,
-                  decoration: const InputDecoration(hintText: "Tulis komentar (min. 5 huruf)...", border: OutlineInputBorder()),
+                const SizedBox(height: 20),
+                // Input Komentar Soft
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: TextField(
+                    controller: commentController,
+                    maxLines: 3,
+                    enabled: !isSending,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: const InputDecoration(
+                      hintText: "Tulis kesan Anda di sini (min. 5 huruf)...",
+                      border: InputBorder.none,
+                      hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: isSending ? null : () => Navigator.pop(context), child: const Text("Batal")),
+            TextButton(
+              onPressed: isSending ? null : () => Navigator.pop(context), 
+              child: const Text("Batal", style: TextStyle(color: Colors.grey))
+            ),
             ElevatedButton(
               onPressed: isSending ? null : () async {
-                if (commentController.text.length < 5) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Komentar minimal 5 huruf")));
+                if (commentController.text.trim().length < 5) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Komentar minimal 5 huruf"))
+                  );
                   return;
                 }
+                
                 setStateDialog(() => isSending = true);
                 final SharedPreferences prefs = await SharedPreferences.getInstance();
                 int userId = prefs.getInt('user_id') ?? 0;
@@ -69,12 +102,17 @@ class ReservationDetailScreen extends StatelessWidget {
                 setStateDialog(() => isSending = false);
                 if (context.mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(result['message']), backgroundColor: result['success'] ? Colors.green : Colors.red),
-                  );
+                  // Notifikasi Modern
+                  ModernNotify.show(context, result['message'], isError: !result['success']);
                 }
               },
-              child: const Text("Kirim"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: isSending 
+                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text("Kirim", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -84,66 +122,127 @@ class ReservationDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // KUNCI: Ambil warna tema aktif (Valentine = Pink, HUT RI = Merah)
-    final primaryColor = Theme.of(context).primaryColor;
+    // Penanganan data tamu dari list details (Laravel Port 8000)
+    final List<dynamic> details = (reservation['details'] != null && reservation['details'] is List) 
+        ? reservation['details'] : [];
+    final Map<String, dynamic> detailTamu = details.isNotEmpty 
+        ? details[0] as Map<String, dynamic> 
+        : {"nama_tamu": "-", "nik_identitas": "-", "jumlah_tamu": 0};
 
-    final List<dynamic> details = (reservation['details'] != null && reservation['details'] is List) ? reservation['details'] : [];
-    final Map<String, dynamic> detailTamu = details.isNotEmpty ? details[0] as Map<String, dynamic> : {"nama_tamu": "-", "nik_identitas": "-", "jumlah_tamu": 0};
-
+    // Logika Status Pembayaran (2 = Lunas)
     bool isPaid = reservation['status_reservasi_id'].toString() == '2';
-    Color statusColor = isPaid ? Colors.green : Colors.orange;
+    String statusText = isPaid ? "BERHASIL DIBAYAR" : "MENUNGGU PEMBAYARAN";
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("Detail Reservasi"), 
-        backgroundColor: primaryColor, // Ikuti Tema (Pink/Merah/Biru)
-        foregroundColor: Colors.white,
+        title: const Text("Detail Reservasi", 
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // --- 1. BANNER EVENT (Agar sinkron dengan Home) ---
-            const EventHeader(),
+            // ── 1. HEADER GRADIEN NAVY (RADIUS 60) ───────────────────────────
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 60, bottom: 45),
+              decoration: const BoxDecoration(
+                gradient: AppTheme.headerGradient,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(60), 
+                  bottomRight: Radius.circular(60)
+                ),
+                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, 8))],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 45),
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    reservation['nama_tipe']?.toString() ?? "Kamar Purnama", 
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 0.5)
+                  ),
+                  const SizedBox(height: 10),
+                  // Badge Status Capsule
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2), 
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.1))
+                    ),
+                    child: Text(
+                      statusText,
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const EventHeader(), // Banner Event Port 8001
 
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1), 
-                      borderRadius: BorderRadius.circular(12), 
-                      border: Border.all(color: statusColor)
-                    ),
-                    child: Column(
-                      children: [
-                        Text(reservation['nama_tipe']?.toString() ?? "Kamar", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        Text(isPaid ? "SUDAH DIBAYAR" : "MENUNGGU PEMBAYARAN", style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
+                  // ── 2. CARD INFORMASI RESERVASI ──────────────────────────────
+                  const Text("Rincian Jadwal", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  const SizedBox(height: 15),
+                  _buildDetailCard([
+                    _itemRow(Icons.calendar_today_rounded, "Check-in", reservation['tgl_checkin'] ?? "-"),
+                    _itemRow(Icons.calendar_month_rounded, "Check-out", reservation['tgl_checkout'] ?? "-"),
+                    _itemRow(Icons.person_pin_rounded, "Nama Tamu", detailTamu['nama_tamu']),
+                    _itemRow(Icons.fingerprint_rounded, "NIK Identitas", detailTamu['nik_identitas']),
+                  ]),
+
                   const SizedBox(height: 25),
-                  _itemRow("Check-in", reservation['tgl_checkin'] ?? "-"),
-                  _itemRow("Check-out", reservation['tgl_checkout'] ?? "-"),
-                  _itemRow("Nama Tamu", detailTamu['nama_tamu']),
-                  const Divider(height: 40),
+
+                  // ── 3. CARD RINCIAN PEMBAYARAN ─────────────────────────────
+                  const Text("Informasi Transaksi", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+                  const SizedBox(height: 15),
+                  _buildDetailCard([
+                    _itemRow(Icons.account_balance_wallet_rounded, "Metode Pembayaran", reservation['metode_pembayaran'] ?? "-"),
+                    _itemRow(Icons.monetization_on_rounded, "Total Bayar", 
+                      "Rp ${double.parse(reservation['total_harga'].toString()).toStringAsFixed(0)}", 
+                      isPrice: true
+                    ),
+                  ]),
+
+                  const SizedBox(height: 45),
                   
+                  // ── 4. TOMBOL ULASAN (Hanya Aktif Jika Sudah Dibayar) ────────
                   if (isPaid)
                     SizedBox(
                       width: double.infinity,
+                      height: 56,
                       child: ElevatedButton.icon(
                         onPressed: () => _showReviewDialog(context),
-                        icon: const Icon(Icons.rate_review, color: Colors.white),
-                        label: const Text("BERI ULASAN KAMAR", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                        icon: const Icon(Icons.star_half_rounded, color: Colors.white),
+                        label: const Text("BERI ULASAN PENGALAMAN", 
+                          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, fontSize: 14)
+                        ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor, // Tombol ikuti tema
-                          padding: const EdgeInsets.all(15),
+                          backgroundColor: AppTheme.primaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          elevation: 8,
+                          shadowColor: AppTheme.primaryBlue.withOpacity(0.4),
                         ),
                       ),
                     ),
+                  const SizedBox(height: 60),
                 ],
               ),
             ),
@@ -153,14 +252,50 @@ class ReservationDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _itemRow(String label, String value) {
+  // Widget Helper: Wadah Kartu Putih
+  Widget _buildDetailCard(List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  // Widget Helper: Baris Informasi dengan Ikon
+  Widget _itemRow(IconData icon, String label, String value, {bool isPrice = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 16)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryBlue.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 20, color: AppTheme.primaryBlue.withOpacity(0.7)),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+                const SizedBox(height: 2),
+                Text(value, style: TextStyle(
+                  fontWeight: FontWeight.bold, 
+                  fontSize: 15, 
+                  color: isPrice ? AppTheme.goldAccent : Colors.black87
+                )),
+              ],
+            ),
+          ),
         ],
       ),
     );

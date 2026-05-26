@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
 import 'reservation_detail_screen.dart';
-import '../event/event_header.dart'; // Import Header Event
+import '../../colors/login_constants.dart';
 
 class ReservationHistoryScreen extends StatefulWidget {
   const ReservationHistoryScreen({super.key});
-
   @override
   State<ReservationHistoryScreen> createState() => _ReservationHistoryScreenState();
 }
@@ -28,113 +27,98 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // KUNCI: Ambil warna tema aktif
-    final primaryColor = Theme.of(context).primaryColor;
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _historyData,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue));
+        }
+        if (snapshot.hasError || snapshot.data?['success'] == false) {
+          return _buildEmptyState();
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Riwayat Reservasi"),
-        backgroundColor: primaryColor, // Ikuti tema
-        foregroundColor: Colors.white,
-      ),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _historyData,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: primaryColor));
-          }
+        List<dynamic> history = snapshot.data?['data'] ?? [];
+        if (history.isEmpty) return _buildEmptyState();
 
-          if (snapshot.hasError || snapshot.data?['success'] == false) {
-            return const Center(child: Text("Gagal mengambil riwayat."));
-          }
+        return RefreshIndicator(
+          onRefresh: () async {
+            setState(() { _historyData = _fetchHistory(); });
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100), // Padding bawah agar tidak tertutup navbar
+            itemCount: history.length,
+            itemBuilder: (context, index) {
+              final item = history[index];
+              
+              // Logika Mapping Status
+              Color statusColor;
+              String statusLabel;
+              switch (item['status_reservasi_id'].toString()) {
+                case '1': statusColor = Colors.orange.shade700; statusLabel = "MENUNGGU BAYAR"; break;
+                case '2': statusColor = Colors.green.shade700; statusLabel = "BERHASIL"; break;
+                default: statusColor = Colors.red.shade700; statusLabel = "BATAL";
+              }
 
-          List<dynamic> history = snapshot.data?['data'] ?? [];
-
-          return Column(
-            children: [
-              // --- TAMBAHAN: BANNER EVENT DI ATAS RIWAYAT ---
-              const EventHeader(),
-
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(15),
-                  itemCount: history.length,
-                  itemBuilder: (context, index) {
-                    final item = history[index];
-                    
-                    Color statusColor;
-                    String statusLabel;
-                    switch (item['status_reservasi_id']) {
-                      case 1:
-                        statusColor = Colors.orange;
-                        statusLabel = "MENUNGGU PEMBAYARAN";
-                        break;
-                      case 2:
-                        statusColor = Colors.green;
-                        statusLabel = "SUDAH DIBAYAR";
-                        break;
-                      default:
-                        statusColor = Colors.red;
-                        statusLabel = "BATAL / GAGAL";
-                    }
-
-                    return InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ReservationDetailScreen(reservation: item),
-                          ),
-                        );
-                      },
-                      child: Card(
-                        elevation: 4,
-                        margin: const EdgeInsets.only(bottom: 15),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(15),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    item['nama_tipe'] ?? "Kamar",
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Text(
-                                      statusLabel,
-                                      style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Divider(height: 25),
-                              Text("Check-in: ${item['tgl_checkin']}"),
-                              const SizedBox(height: 10),
-                              Text(
-                                "Total: Rp ${double.parse(item['total_harga'].toString()).toStringAsFixed(0)}",
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor), // Warna teks total sesuai tema
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+              return Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 8))],
+                  border: Border.all(color: Colors.grey.shade100),
                 ),
-              ),
-            ],
-          );
-        },
-      ),
+                child: InkWell(
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReservationDetailScreen(reservation: item))),
+                  borderRadius: BorderRadius.circular(25),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(child: Text(item['nama_tipe'] ?? "Kamar Purnama", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppTheme.primaryBlue))),
+                            _statusBadge(statusLabel, statusColor),
+                          ],
+                        ),
+                        const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: Divider(height: 1)),
+                        Row(
+                          children: [
+                            const Icon(Icons.calendar_month_rounded, size: 16, color: Colors.grey),
+                            const SizedBox(width: 8),
+                            Text("Check-in: ${item['tgl_checkin']}", style: const TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text("Rp ${double.parse(item['total_harga'].toString()).toStringAsFixed(0)}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.primaryBlue)),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.goldAccent),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
+  }
+
+  Widget _statusBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+      child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 9)),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.event_busy_rounded, size: 70, color: Colors.grey[300]), const SizedBox(height: 10), const Text("Belum ada reservasi hotel.", style: TextStyle(color: Colors.grey))]));
   }
 }

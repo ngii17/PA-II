@@ -21,9 +21,6 @@ class FcmService
         $this->keyFile = config('services.fcm.key_file');
     }
 
-    /**
-     * Fungsi untuk mendapatkan Access Token dari Google secara otomatis (v1)
-     */
     private function getAccessToken()
     {
         $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
@@ -32,16 +29,13 @@ class FcmService
         return $token['access_token'];
     }
 
-    /**
-     * Method send() versi HTTP v1
-     */
     public function send($fcmToken, $title, $body, $data = [])
     {
         try {
             $accessToken = $this->getAccessToken();
             $url = "https://fcm.googleapis.com/v1/projects/{$this->projectId}/messages:send";
 
-            // Struktur JSON v1 berbeda dengan Legacy (Wajib dibungkus objek 'message')
+            // Tambahkan konfigurasi Android agar Notif melayang (Swipe-in)
             $payload = [
                 'message' => [
                     'token' => $fcmToken,
@@ -49,7 +43,25 @@ class FcmService
                         'title' => $title,
                         'body'  => $body,
                     ],
-                    'data' => array_map('strval', $data), // Semua data di v1 wajib String
+                    // --- TAMBAHAN KHUSUS UNTUK NOTIF MELAYANG (HEADS-UP) ---
+                    'android' => [
+                        'priority' => 'high', // Memberitahu Google ini pesan mendesak
+                        'notification' => [
+                            'channel_id' => 'purnama_high_importance_channel', // WAJIB: Sama dengan di Flutter
+                            'priority' => 'high', // Prioritas di tingkat sistem Android
+                            'sound' => 'default',
+                        ],
+                    ],
+                    'apns' => [ // Untuk pengguna iPhone agar tetap konsisten
+                        'payload' => [
+                            'aps' => [
+                                'sound' => 'default',
+                                'content-available' => 1,
+                            ],
+                        ],
+                    ],
+                    // -------------------------------------------------------
+                    'data' => array_map('strval', $data), 
                 ]
             ];
 

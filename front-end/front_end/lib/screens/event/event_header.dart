@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/event_provider.dart';
+import '../../../providers/event_provider.dart';
 
 class EventHeader extends StatelessWidget {
   const EventHeader({super.key});

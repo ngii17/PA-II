@@ -6,26 +6,27 @@ plugins {
 }
 
 android {
-    namespace = "com.example.front_end"
-    compileSdk = flutter.compileSdkVersion
+    namespace = "com.purnama" 
+
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
         
-        // --- 1. AKTIFKAN DESUGARING (SOLUSI ERROR) ---
-        isCoreLibraryDesugaringEnabled = true 
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
-        applicationId = "com.example.front_end"
+        applicationId = "com.purnama.purnama"
+
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -41,7 +42,10 @@ flutter {
     source = "../.."
 }
 
-// --- 2. PERBAIKAN: UPDATE VERSI KE 2.1.4 AGAR TIDAK ERROR LAGI ---
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-analytics")
 }

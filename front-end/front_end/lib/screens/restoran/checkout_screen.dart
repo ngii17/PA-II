@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Tambahkan ini
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+// Services & Providers
 import '../../services/api_services.dart';
-import '../../providers/cart_provider.dart'; // Tambahkan ini
+import '../../providers/cart_provider.dart';
+
+// Screens
 import 'menu_resto.dart';
 import 'waiting_payment_screen.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // <--- Tambahkan ini
+
+// Widgets & Constants
+import '../../colors/login_constants.dart';
+import '../../widgets/login_widgets.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final Map<int, int> cart;
@@ -25,6 +33,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _promoName = "";
   bool _isProcessing = false;
 
+  // Mendapatkan detail item dari keranjang
   List<Map<String, dynamic>> _getCartItemsDetails() {
     List<Map<String, dynamic>> details = [];
     widget.cart.forEach((id, qty) {
@@ -38,6 +47,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return details;
   }
 
+  // Hitung Subtotal asli
   double _getSubtotal() {
     double total = 0;
     widget.cart.forEach((id, qty) {
@@ -47,7 +57,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return total;
   }
 
+  // Logika Cek Kode Promo (Port 8000)
   void _checkPromo() async {
+    if (_promoController.text.isEmpty) return;
+    
     final result = await ApiServices.checkPromoCode(_promoController.text, 'restoran');
     if (result['success'] == true) {
       setState(() {
@@ -57,54 +70,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ? (_getSubtotal() * (pot / 100)) 
             : pot;
       });
-      _showSnackBar("Promo berhasil dipasang!", Colors.green);
+      ModernNotify.show(context, "Promo '$_promoName' berhasil dipasang!", isError: false);
     } else {
       setState(() { _discount = 0; _promoName = ""; });
-      _showSnackBar(result['message'] ?? "Kode promo tidak valid", Colors.red);
+      ModernNotify.show(context, result['message'] ?? "Kode promo tidak valid");
     }
   }
 
-  // --- PERBAIKAN FUNGSI BAYAR ---
+  // --- LOGIKA UTAMA PEMBAYARAN & ORDER ---
   void _payNow() async {
     if (_isProcessing) return;
-
     setState(() => _isProcessing = true);
     
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       int? userId = prefs.getInt('user_id');
 
-      // --- TAMBAHAN: Ambil Token FCM dari Firebase ---
+      // AMBIL TOKEN FCM UNTUK NOTIFIKASI KASIR/DAPUR
       String? fcmToken = await FirebaseMessaging.instance.getToken();
-      print("FCM Token Anda: $fcmToken"); // Untuk debugging di console
 
       List<Map<String, dynamic>> items = [];
       widget.cart.forEach((id, qty) => items.add({"menu_id": id, "jumlah": qty}));
 
-      // Kirim data ke Laravel
+      // Kirim Data Order ke Server Laravel
       final result = await ApiServices.placeRestaurantOrder({
         "user_id": userId ?? 1,
-        "fcm_token": fcmToken, // <--- SEKARANG TOKEN SUDAH TERKIRIM
+        "fcm_token": fcmToken,
         "metode_pembayaran": _paymentMethod,
         "total_harga": _getSubtotal() - _discount,
         "items": items
       });
 
       if (result['success'] == true) {
+        // 1. KOSONGKAN KERANJANG DI PROVIDER
         if (mounted) {
           context.read<CartProvider>().clearCart();
         }
 
+        // 2. LOGIKA ARAHAN PEMBAYARAN
         if (_paymentMethod != "Bayar di Kasir") {
           String? redirectUrl = result['redirect_url'];
-          
-          // Perbaikan pengambilan orderId agar lebih aman
-          int? orderId;
-          if (result['data'] != null && result['data']['order_id'] != null) {
-            orderId = result['data']['order_id'];
-          } else {
-            orderId = result['order_id'];
-          }
+          int? orderId = result['data'] != null ? result['data']['order_id'] : result['order_id'];
 
           if (redirectUrl != null && orderId != null) {
             await launchUrl(Uri.parse(redirectUrl), mode: LaunchMode.externalApplication);
@@ -115,10 +121,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _showSuccessCashDialog();
         }
       } else {
-        _showSnackBar(result['message'] ?? "Gagal memproses pesanan", Colors.red);
+        ModernNotify.show(context, result['message'] ?? "Gagal memproses pesanan");
       }
     } catch (e) {
-      _showSnackBar("Terjadi kesalahan sistem: $e", Colors.red);
+      ModernNotify.show(context, "Kesalahan Sistem: $e");
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -129,130 +135,175 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text("Berhasil!"),
-        content: const Text("Pesanan diterima. Silakan lakukan pembayaran di Kasir."),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Pesanan Diterima!", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text("Silakan lakukan pembayaran di Kasir Restoran dengan menyebutkan ID Pesanan Anda."),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-            child: const Text("OK"),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue),
+            child: const Text("OK", style: TextStyle(color: Colors.white)),
           )
         ],
       ),
     );
   }
 
-  void _showSnackBar(String msg, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: color, behavior: SnackBarBehavior.floating),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
     final cartItems = _getCartItemsDetails();
     double subtotal = _getSubtotal();
     double grandTotal = subtotal - _discount;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text("Konfirmasi Pesanan"),
-        backgroundColor: primaryColor,
+        title: const Text("Konfirmasi Pesanan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundColor: AppTheme.primaryBlue,
         foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Daftar Pesanan", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: cartItems.length,
-              itemBuilder: (context, index) {
-                final item = cartItems[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(item['menu'].namaMenu, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text("${item['qty']} x Rp ${item['menu'].harga.toStringAsFixed(0)}"),
-                  trailing: Text("Rp ${item['total'].toStringAsFixed(0)}"),
-                );
-              },
-            ),
-            const Divider(height: 30),
+            _buildSectionTitle("Daftar Menu"),
+            const SizedBox(height: 12),
+            _buildOrderList(cartItems),
             
-            const Text("Metode Pembayaran", style: TextStyle(fontWeight: FontWeight.bold)),
-            DropdownButton<String>(
-              isExpanded: true,
-              value: _paymentMethod,
-              items: ["Transfer Bank", "E-Wallet", "Bayar di Kasir"].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-              onChanged: (v) => setState(() => _paymentMethod = v!),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 30),
+            _buildSectionTitle("Metode Pembayaran"),
+            const SizedBox(height: 12),
+            _buildPaymentDropdown(),
 
-            const Text("Punya Kode Promo?", style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _promoController,
-                    decoration: const InputDecoration(hintText: "Kode Promo", border: OutlineInputBorder()),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton(onPressed: _checkPromo, child: const Text("CEK")),
-              ],
-            ),
-            
             const SizedBox(height: 30),
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(10)),
-              child: Column(
-                children: [
-                  _buildPriceRow("Subtotal", "Rp ${subtotal.toStringAsFixed(0)}"),
-                  if (_discount > 0) _buildPriceRow("Potongan Promo", "- Rp ${_discount.toStringAsFixed(0)}", color: Colors.red),
-                  const Divider(),
-                  _buildPriceRow("Total Bayar", "Rp ${grandTotal.toStringAsFixed(0)}", isBold: true, color: primaryColor),
-                ],
-              ),
-            ),
-            const SizedBox(height: 30),
+            _buildSectionTitle("Promo & Voucher"),
+            const SizedBox(height: 12),
+            _buildPromoSection(),
             
+            const SizedBox(height: 40),
+            _buildPriceSummary(subtotal, grandTotal),
+            
+            const SizedBox(height: 40),
             _isProcessing
-                ? const Center(child: CircularProgressIndicator())
-                : SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      onPressed: _payNow,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text("BAYAR SEKARANG", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                    ),
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryBlue))
+                : ModernButton(
+                    text: "BAYAR SEKARANG", 
+                    onPressed: _payNow,
+                    isResto: true, // Warna Gold untuk Resto
                   ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 60),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPriceRow(String label, String value, {bool isBold = false, Color color = Colors.black}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildSectionTitle(String title) {
+    return Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppTheme.primaryBlue, letterSpacing: 0.5));
+  }
+
+  Widget _buildOrderList(List<Map<String, dynamic>> items) {
+    return Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)]),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        separatorBuilder: (c, i) => const Divider(height: 1, indent: 20, endIndent: 20),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            title: Text(item['menu'].namaMenu, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text("${item['qty']} porsi x Rp ${item['menu'].harga.toStringAsFixed(0)}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            trailing: Text("Rp ${item['total'].toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primaryBlue)),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPaymentDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey.shade200)),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: _paymentMethod,
+          items: ["Transfer Bank", "E-Wallet", "Bayar di Kasir"].map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontWeight: FontWeight.bold)))).toList(),
+          onChanged: (v) => setState(() => _paymentMethod = v!),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPromoSection() {
+    return Row(
+      children: [
+        Expanded(
+          child: ModernInput(
+            controller: _promoController, 
+            label: "KODE PROMO", 
+            hint: "Masukkan kode", 
+            icon: Icons.confirmation_number_outlined,
+            activeColor: AppTheme.goldAccent,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Padding(
+          padding: const EdgeInsets.only(top: 20),
+          child: SizedBox(
+            height: 55,
+            child: ElevatedButton(
+              onPressed: _checkPromo,
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+              child: const Text("CEK", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPriceSummary(double subtotal, double grandTotal) {
+    return Container(
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryBlue.withOpacity(0.04), 
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: AppTheme.primaryBlue.withOpacity(0.1)),
+      ),
+      child: Column(
         children: [
-          Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: color, fontSize: isBold ? 18 : 14)),
+          _summaryRow("Subtotal", "Rp ${subtotal.toStringAsFixed(0)}"),
+          if (_discount > 0) ...[
+            const SizedBox(height: 10),
+            _summaryRow("Potongan Promo", "- Rp ${_discount.toStringAsFixed(0)}", color: Colors.red),
+          ],
+          const Padding(padding: EdgeInsets.symmetric(vertical: 15), child: Divider()),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Total Bayar", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              Text("Rp ${grandTotal.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: AppTheme.goldAccent)),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, {Color color = Colors.black87}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+      ],
     );
   }
 }

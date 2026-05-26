@@ -1,21 +1,54 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+// --- WAJIB: Fungsi ini harus di luar class (Top Level) agar Background Notif Jalan ---
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("Menangani pesan latar belakang: ${message.messageId}");
+}
 
 class PushNotificationService {
   static final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
-  // 1. Inisialisasi Firebase & Notifikasi Lokal
-  static Future<void> initialize() async {
-    // Minta izin ke user (untuk Android 13+)
-    await _fcm.requestPermission();
+  // 1. DEFINISI CHANNEL TINGKAT TINGGI (Kunci agar Notif muncul dari atas/Heads-up)
+  static const AndroidNotificationChannel _purnamaChannel = AndroidNotificationChannel(
+    'purnama_high_importance_channel', // ID unik
+    'Notifikasi Transaksi Purnama',      // Nama di pengaturan HP
+    description: 'Notifikasi konfirmasi booking dan pesanan restoran',
+    importance: Importance.max,         // WAJIB: Max agar melayang (Swipe-in)
+    playSound: true,
+    enableVibration: true,
+  );
 
-    // Konfigurasi Ikon Android
+  // 2. Inisialisasi Utama
+  static Future<void> initialize() async {
+    // Minta Izin penuh ke User (Android 13+ & iOS)
+    NotificationSettings settings = await _fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('Izin Notifikasi Diberikan');
+    }
+
+    // Daftarkan Background Handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Daftarkan Channel ke sistem Android
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_purnamaChannel);
+
+    // Konfigurasi Ikon & Settings Inisialisasi
     const AndroidInitializationSettings androidSettings = 
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    // Konfigurasi iOS/Darwin
     const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
 
     const InitializationSettings initSettings = InitializationSettings(
@@ -23,49 +56,64 @@ class PushNotificationService {
       iOS: iosSettings,
     );
 
-    // --- PERBAIKAN: Menggunakan label 'settings' sesuai permintaan VS Code kamu ---
+    // Initialisasi Plugin
     await _localNotifications.initialize(
-      settings: initSettings,
+      initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         if (response.payload != null) {
-          Map<String, dynamic> data = jsonDecode(response.payload!);
-          print("Notif diklik dengan data: $data");
+          print("Notif diklik: ${response.payload}");
+          // Di sini Anda bisa menambahkan navigasi ke halaman NotificationScreen
         }
       },
     );
 
-    // Mendengarkan pesan saat aplikasi sedang dibuka (Foreground)
+    // --- HANDLING FOREGROUND (Saat aplikasi sedang dibuka) ---
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print("Pesan masuk saat aplikasi terbuka!");
       _showLocalNotification(message);
+    });
+
+    // --- HANDLING BACKGROUND CLICK (Saat notif diklik dari tray) ---
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print("Aplikasi terbuka karena notif diklik: ${message.data}");
     });
   }
 
-  // 2. Fungsi untuk mendapatkan Token HP yang ASLI
+  // 3. Fungsi Ambil Token FCM (Kirim ini ke Laravel Database)
   static Future<String?> getDeviceToken() async {
     return await _fcm.getToken();
   }
 
-  // 3. Menampilkan Pesan Melayang (Pop-up)
+  // 4. Fungsi Menampilkan Notifikasi (Popup/Heads-up)
   static void _showLocalNotification(RemoteMessage message) {
-    const AndroidNotificationDetails androidDetail = AndroidNotificationDetails(
-      'purnama_channel', 
-      'Purnama Notif',
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-    );
+    RemoteNotification? notification = message.notification;
 
-    const NotificationDetails platformDetail = NotificationDetails(
-      android: androidDetail,
-    );
-
-    // --- PERBAIKAN: Menggunakan label lengkap agar tidak error 'positional arguments' ---
-    _localNotifications.show(
-      id: DateTime.now().millisecond, 
-      title: message.notification?.title ?? "Purnama Hotel",
-      body: message.notification?.body ?? "",
-      notificationDetails: platformDetail,
-      payload: jsonEncode(message.data),
-    );
+    if (notification != null) {
+      _localNotifications.show(
+        notification.hashCode, // ID unik notif
+        notification.title,    // Judul
+        notification.body,     // Isi
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _purnamaChannel.id,
+            _purnamaChannel.name,
+            channelDescription: _purnamaChannel.description,
+            importance: Importance.max,
+            priority: Priority.high,
+            ticker: 'ticker',
+            icon: '@mipmap/ic_launcher',
+            // Menambah efek visual premium
+            enableLights: true,
+            color: const Color(0xFF00197D), // Warna Navy Hotel Purnama
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        payload: jsonEncode(message.data),
+      );
+    }
   }
 }

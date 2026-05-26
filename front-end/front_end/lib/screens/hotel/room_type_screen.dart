@@ -1,9 +1,10 @@
 class RoomType {
   final int id;
   final String namaTipe;
-  final double hargaAsli;   // Ganti dari harga ke hargaAsli
-  final double hargaAkhir;  // Tambahan untuk harga diskon
-  final String? promoAktif; // Tambahan untuk teks promo (bisa kosong/null)
+  final String? fotoTipe;   // <--- Tambahan field foto
+  final double hargaAsli;   
+  final double hargaAkhir;  
+  final String? promoAktif; 
   final int kapasitas;
   final String fasilitas;
   final String deskripsi;
@@ -11,6 +12,7 @@ class RoomType {
   RoomType({
     required this.id,
     required this.namaTipe,
+    this.fotoTipe,          // <--- Tambahan di constructor
     required this.hargaAsli,
     required this.hargaAkhir,
     this.promoAktif,
@@ -23,10 +25,10 @@ class RoomType {
     return RoomType(
       id: json['id'],
       namaTipe: json['nama_tipe'],
-      // Ambil data baru dari JSON Laravel
+      fotoTipe: json['foto_tipe'], // <--- Tambahan mapping dari JSON Laravel
       hargaAsli: double.parse(json['harga_asli'].toString()),
       hargaAkhir: double.parse(json['harga_akhir'].toString()),
-      promoAktif: json['promo_aktif'], // Bisa berisi "Diskon 10%" atau null
+      promoAktif: json['promo_aktif'],
       kapasitas: json['kapasitas'],
       fasilitas: json['fasilitas'],
       deskripsi: json['deskripsi'],

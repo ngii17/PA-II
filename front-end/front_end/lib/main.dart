@@ -1,37 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // Tambahkan ini
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 // --- IMPORT PROVIDERS ---
 import 'providers/event_provider.dart';
 import 'providers/cart_provider.dart';
 
-// --- IMPORT SERVICES & THEME ---
+// --- IMPORT SERVICES ---
 import 'notification/notification_service.dart';
 import 'screens/event/app_theme.dart';
-import 'screens/user/login_screen.dart';
-import 'screens/notification/notification_screen.dart'; // Import Screen Notifikasi
+
+// --- IMPORT SCREENS ---
+import 'screens/user/premium_splash_screen.dart'; // Memakai Opening Sinematik Anda
+import 'screens/notification/notification_screen.dart';
 
 // 1. GLOBAL NAVIGATOR KEY
-// Ini kunci agar kita bisa pindah halaman dari mana saja tanpa BuildContext
+// Digunakan agar sistem notifikasi bisa melakukan navigasi tanpa context
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
+  // Pastikan binding Flutter siap
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    // Inisialisasi Firebase
     await Firebase.initializeApp();
     
-    // Inisialisasi service dasar
+    // Inisialisasi Service Notifikasi (Lokal & FCM)
     await PushNotificationService.initialize();
 
-    // 2. LOGIKA KLIK NOTIFIKASI (Background & Terminated)
-    setupNotificationInteractions();
+    // 2. SETUP HANDLING KLIK NOTIFIKASI
+    _setupNotificationInteractions();
     
-    print("LOG_NOTIFICATION: Firebase & Interaction Handler Berhasil");
+    debugPrint("LOG_SYSTEM: Firebase & Notification System Ready");
   } catch (e) {
-    print("LOG_ERROR: Gagal inisialisasi Firebase: $e");
+    debugPrint("LOG_ERROR: Gagal inisialisasi Firebase: $e");
   }
 
   runApp(
@@ -45,22 +49,22 @@ void main() async {
   );
 }
 
-// 3. FUNGSI UNTUK MENANGANI KLIK NOTIFIKASI
-void setupNotificationInteractions() async {
-  // A. Jika aplikasi mati total (Terminated) lalu diklik
+// 3. LOGIKA INTERAKSI NOTIFIKASI (Background & Terminated)
+void _setupNotificationInteractions() async {
+  // Case A: Jika aplikasi mati total (Terminated) lalu diklik
   RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   if (initialMessage != null) {
     _navigateToNotificationScreen();
   }
 
-  // B. Jika aplikasi ada di background (tidak mati total) lalu diklik
+  // Case B: Jika aplikasi ada di background (tidak mati) lalu diklik
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
     _navigateToNotificationScreen();
   });
 }
 
 void _navigateToNotificationScreen() {
-  // Menggunakan navigatorKey untuk pindah ke NotificationScreen
+  // Pindah ke Inbox Notifikasi menggunakan navigatorKey
   navigatorKey.currentState?.push(
     MaterialPageRoute(builder: (context) => const NotificationScreen()),
   );
@@ -71,55 +75,24 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Memantau perubahan tema dari EventProvider (Port 8001)
     final eventProvider = context.watch<EventProvider>();
 
     return MaterialApp(
-      navigatorKey: navigatorKey, // <--- 4. PASANG NAVIGATOR KEY DI SINI
-      title: 'Purnama Hotel & Resto',
+      // 4. PASANG NAVIGATOR KEY
+      navigatorKey: navigatorKey, 
+      title: 'Purnama',
+
       debugShowCheckedModeBanner: false,
+      
+      // Tema dinamis yang bisa berubah otomatis sesuai Event aktif
       theme: AppTheme.getTheme(eventProvider.activeTheme),
       
-      // Definisikan rute jika diperlukan, tapi kita gunakan push manual di atas
-      home: const SplashScreenProxy(),
-    );
-  }
-}
+      // 5. HALAMAN PEMBUKA (Premium SplashScreen Sinematik)
+      // Logika pindah ke Login/Home ada di dalam file PremiumSplashScreen setelah animasi selesai
+      // Langsung hanya premium splash (tanpa splash Flutter default lain)
+      home: const PremiumSplashScreen(), 
 
-class SplashScreenProxy extends StatefulWidget {
-  const SplashScreenProxy({super.key});
-
-  @override
-  State<SplashScreenProxy> createState() => _SplashScreenProxyState();
-}
-
-class _SplashScreenProxyState extends State<SplashScreenProxy> {
-  @override
-  void initState() {
-    super.initState();
-    
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<EventProvider>().fetchActiveTheme();
-      }
-    });
-    
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        // Gunakan pushReplacement agar splash screen hilang dari stack
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
     );
   }
 }
