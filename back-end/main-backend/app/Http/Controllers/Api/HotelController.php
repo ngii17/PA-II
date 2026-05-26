@@ -8,6 +8,7 @@ use App\Models\hotel\Promo;
 use App\Models\hotel\Reservasi;
 use App\Models\hotel\DetailReservasi;
 use App\Models\hotel\Kamar;
+use App\Models\hotel\StatusReservasi;
 use App\Services\NotificationClientService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,14 +51,14 @@ class HotelController extends Controller
 
                 // Hitung potongan harga HANYA JIKA promo ditemukan (is_active == true)
                 if ($promoAktif) {
-                    $potongan = ($promoAktif->tipe_diskon == 'persen') 
-                        ? $hargaAsli * ($promoAktif->nominal_potongan / 100) 
+                    $potongan = ($promoAktif->tipe_diskon == 'persen')
+                        ? $hargaAsli * ($promoAktif->nominal_potongan / 100)
                         : (float) $promoAktif->nominal_potongan;
-                    
-                    $infoPromo = ($promoAktif->tipe_diskon == 'persen') 
-                        ? "Diskon " . (int)$promoAktif->nominal_potongan . "%" 
+
+                    $infoPromo = ($promoAktif->tipe_diskon == 'persen')
+                        ? "Diskon " . (int)$promoAktif->nominal_potongan . "%"
                         : "Potongan Rp " . number_format($potongan, 0, ',', '.');
-                    
+
                     $hargaAkhir = $hargaAsli - $potongan;
                 }
 
@@ -86,7 +87,7 @@ class HotelController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'user_id'           => 'required',
-            'fcm_token'         => 'nullable|string', 
+            'fcm_token'         => 'nullable|string',
             'tipe_kamar_id'     => 'required|exists:tipe_kamar,id',
             'tgl_checkin'       => 'required|date|after_or_equal:today',
             'tgl_checkout'      => 'required|date|after:tgl_checkin',
@@ -109,7 +110,7 @@ class HotelController extends Controller
         $totalUnitTersedia = Kamar::where('tipe_kamar_id', $tipeId)->count();
 
         $terbooking = Reservasi::where('tipe_kamar_id', $tipeId)
-            ->whereIn('status_reservasi_id', [1, 2]) 
+            ->whereIn('status_reservasi_id', [1, 2])
             ->where(function ($query) use ($tglIn, $tglOut) {
                 $query->where('tgl_checkin', '<', $tglOut)
                       ->where('tgl_checkout', '>', $tglIn);
@@ -126,14 +127,14 @@ class HotelController extends Controller
         try {
             $reservasi = Reservasi::create([
                 'user_id'            => $request->user_id,
-                'fcm_token'          => $request->fcm_token, 
+                'fcm_token'          => $request->fcm_token,
                 'tipe_kamar_id'      => $request->tipe_kamar_id,
                 'tgl_checkin'        => $request->tgl_checkin,
                 'tgl_checkout'       => $request->tgl_checkout,
                 'total_malam'        => $request->total_malam,
                 'total_harga'        => $request->total_harga,
                 'metode_pembayaran'  => $request->metode_pembayaran,
-                'status_reservasi_id' => 1, 
+                'status_reservasi_id' => 1,
             ]);
 
             DetailReservasi::create([
@@ -166,16 +167,16 @@ class HotelController extends Controller
             ];
 
             $midtransResponse = Snap::createTransaction($params);
-            
+
             $snapToken = $midtransResponse->token;
             $redirectUrl = $midtransResponse->redirect_url;
 
             $reservasi->update(['snap_token' => $snapToken]);
 
             DB::commit();
-            
+
             return response()->json([
-                'success' => true, 
+                'success' => true,
                 'snap_token' => $snapToken,
                 'redirect_url' => $redirectUrl,
                 'reservasi_id' => $reservasi->id
@@ -190,24 +191,36 @@ class HotelController extends Controller
     /**
      * 3. AMBIL RIWAYAT RESERVASI
      */
+    /**
+     * 3. AMBIL RIWAYAT RESERVASI (Versi Fix)
+     */
+    /**
+     * 3. AMBIL RIWAYAT RESERVASI (Versi Fix Nama & NIK)
+     */
     public function getReservationHistory(Request $request)
     {
         $userId = $request->query('user_id');
 
         if (!$userId) {
-            return response()->json(['success' => false, 'message' => 'User ID tidak ditemukan.'], 400);
+            return response()->json(['success' => false, 'message' => 'User ID missing'], 400);
         }
 
         try {
-            $history = Reservasi::with(['details', 'tipeKamar'])
+            // Ambil riwayat dengan relasi detail (identitas), tipeKamar (withTrashed), dan status
+            $history = Reservasi::with(['details', 'tipeKamar' => function($q){
+                    $q->withTrashed();
+                }, 'statusReservasi'])
                 ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc')
                 ->get();
 
             $data = $history->map(function ($res) {
+                // Ambil rincian tamu dari relasi details (yang baru kita buat di model)
+                $detailTamu = $res->details->first();
+
                 return [
                     'id'                  => $res->id,
-                    'tipe_kamar_id'       => $res->tipe_kamar_id, 
+                    'tipe_kamar_id'       => $res->tipe_kamar_id,
                     'tgl_checkin'         => $res->tgl_checkin,
                     'tgl_checkout'        => $res->tgl_checkout,
                     'total_malam'         => $res->total_malam,
@@ -216,6 +229,13 @@ class HotelController extends Controller
                     'status_reservasi_id' => $res->status_reservasi_id,
                     'snap_token'          => $res->snap_token,
                     'nama_tipe'           => $res->tipeKamar->nama_tipe ?? 'Kamar',
+
+                    // --- DATA IDENTITAS (Dipindah ke level depan agar Flutter mudah baca) ---
+                    'nama_tamu'           => $detailTamu->nama_tamu ?? '-',
+                    'nik_identitas'       => $detailTamu->nik_identitas ?? '-',
+                    'jumlah_tamu'         => $detailTamu->jumlah_tamu ?? 0,
+
+                    // Kita tetap kirim details asli sebagai cadangan
                     'details'             => $res->details,
                 ];
             });
@@ -239,24 +259,24 @@ class HotelController extends Controller
         $hashed = hash("sha512", $request->order_id . $request->status_code . $request->gross_amount . $serverKey);
 
         if ($hashed == $request->signature_key) {
-            $orderId = $request->order_id; 
+            $orderId = $request->order_id;
             $orderIdParts = explode('-', $orderId);
-            $prefix = $orderIdParts[0]; 
+            $prefix = $orderIdParts[0];
             $actualId = $orderIdParts[1];
 
             // --- A. JIKA TRANSAKSI HOTEL (INV) ---
             if ($prefix == 'INV') {
                 $reservasi = \App\Models\hotel\Reservasi::with('tipeKamar')->find($actualId);
-                
+
                 if ($reservasi) {
                     if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
-                        
+
                         $kamar = \App\Models\hotel\Kamar::where('tipe_kamar_id', $reservasi->tipe_kamar_id)
                                              ->where('status_kamar_id', 1)->first();
-                        
+
                         // Update status lunas & penempatan kamar
                         $reservasi->update([
-                            'status_reservasi_id' => 2, 
+                            'status_reservasi_id' => 2,
                             'kamar_id' => $kamar ? $kamar->id : null
                         ]);
 
@@ -267,27 +287,27 @@ class HotelController extends Controller
                         // PICU NOTIFIKASI HOTEL
                         try {
                             $this->notifService->bookingConfirmed(
-                                $reservasi->fcm_token ?? 'no_token', 
+                                $reservasi->fcm_token ?? 'no_token',
                                 $reservasi->user_id,
-                                $reservasi->id, 
-                                $reservasi->tipeKamar->nama_tipe ?? 'Kamar', 
+                                $reservasi->id,
+                                $reservasi->tipeKamar->nama_tipe ?? 'Kamar',
                                 $reservasi->tgl_checkin
                             );
                         } catch (\Exception $e) {
-                            Log::error("Gagal kirim notif hotel: " . $e->getMessage()); 
+                            Log::error("Gagal kirim notif hotel: " . $e->getMessage());
                         }
                     } else if (in_array($request->transaction_status, ['deny', 'expire', 'cancel'])) {
                         $reservasi->update(['status_reservasi_id' => 4]);
                     }
                 }
-            } 
-            
+            }
+
             // --- B. JIKA TRANSAKSI RESTORAN (RESTO) ---
     // ... di dalam handleCallback ...
 else if ($prefix == 'RESTO') {
     // Gunakan eager load jika perlu, tapi find saja cukup
     $pesanan = \App\Models\restoran\PesananMenu::find($actualId);
-    
+
     if ($pesanan) {
         if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
             $pesanan->update(['status_pembayaran_id' => 2]);
@@ -295,9 +315,9 @@ else if ($prefix == 'RESTO') {
             // PAKSA KIRIM NOTIFIKASI
             try {
                 $this->notifService->orderConfirmed(
-                    $pesanan->fcm_token ?? 'TOKEN_KOSONG', 
-                    $pesanan->user_id, 
-                    $pesanan->id, 
+                    $pesanan->fcm_token ?? 'TOKEN_KOSONG',
+                    $pesanan->user_id,
+                    $pesanan->id,
                     (float)$pesanan->total_harga
                 );
             } catch (\Exception $e) {

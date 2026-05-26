@@ -37,13 +37,13 @@ class RestoranController extends Controller
             $activeEvent = Event::where('is_active', true)->first();
 
             // 2. LOGIKA FILTER (Poin permintaanmu):
-            
+
             // JIKA TEMA 'DEFAULT' (Bukan Hari Besar)
             if (!$activeEvent || $activeEvent->event_code == 'default') {
                 // Ambil SEMUA menu tanpa terkecuali
                 $menus = Menu::with(['kategori', 'status'])->get();
-            } 
-            
+            }
+
             // JIKA TEMA HARI BESAR AKTIF (HUT RI, Valentine, dll)
             else {
                 // HANYA ambil menu yang didaftarkan (punya relasi) ke event tersebut
@@ -174,7 +174,7 @@ class RestoranController extends Controller
                 'message'      => 'Pesanan berhasil dibuat!',
                 'snap_token'   => $snapToken,
                 'redirect_url' => $redirectUrl,
-                'data'         => [ 
+                'data'         => [
                     'order_id'    => $pesanan->id,
                     'total_bayar' => $totalHarga,
                     'lokasi'      => $request->tipe_pengantaran . ' ' . $request->nomor_lokasi
@@ -218,9 +218,9 @@ class RestoranController extends Controller
 
             if ($pesanan) {
                 if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
-                    $pesanan->update(['status_pembayaran_id' => 2]); 
+                    $pesanan->update(['status_pembayaran_id' => 2]);
                 } else if (in_array($request->transaction_status, ['deny', 'expire', 'cancel'])) {
-                    $pesanan->update(['status_pembayaran_id' => 4]); 
+                    $pesanan->update(['status_pembayaran_id' => 4]);
                 }
             }
         }
@@ -238,7 +238,7 @@ class RestoranController extends Controller
 
         return response()->json([
             'success' => true,
-            'status_bayar_id' => (int) $pesanan->status_pembayaran_id, 
+            'status_bayar_id' => (int) $pesanan->status_pembayaran_id,
         ]);
     }
 
@@ -271,7 +271,56 @@ class RestoranController extends Controller
                 'message' => 'Riwayat pesanan berhasil dimuat.',
                 'data'    => $history
             ], 200);
-            
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * FUNGSI UPDATE STATUS PESANAN (Hanya 4 Status)
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        // Validasi: Hanya menerima ID 1, 2, 3, atau 4
+        $validator = Validator::make($request->all(), [
+            'status_pesanan_id' => 'required|integer|in:1,2,3,4',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            // Cari data pesanan
+            $pesanan = \App\Models\restoran\PesananMenu::find($id);
+
+            if (!$pesanan) {
+                return response()->json(['success' => false, 'message' => 'Pesanan tidak ditemukan'], 404);
+            }
+
+            // Update status di database (Pastikan nama kolom di tabel pesanan_menu sesuai)
+            $pesanan->update([
+                'status_pesanan_id' => $request->status_pesanan_id
+            ]);
+
+            // --- LOGIKA PEMICU NOTIFIKASI ---
+
+            // HANYA jika status berubah menjadi 3 (Disajikan)
+            if ($request->status_pesanan_id == 3) {
+                $this->notifService->orderReady(
+                    $pesanan->fcm_token ?? 'no_token',
+                    $pesanan->user_id,
+                    $pesanan->id
+                );
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Status pesanan diperbarui ke: ' . $this->_getStatusName($request->status_pesanan_id),
+                'notif_sent' => ($request->status_pesanan_id == 3) ? 'Yes' : 'No'
+            ]);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false, 

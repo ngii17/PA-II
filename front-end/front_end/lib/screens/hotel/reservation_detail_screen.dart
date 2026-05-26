@@ -8,10 +8,14 @@ class ReservationDetailScreen extends StatelessWidget {
 
   const ReservationDetailScreen({super.key, required this.reservation});
 
+  // ... (kode import tetap sama)
+
   void _showReviewDialog(BuildContext context) {
     final TextEditingController commentController = TextEditingController();
     int selectedRating = 5;
+    bool isAnonymous = false; // 1. TAMBAHKAN VARIABEL INI
     bool isSending = false;
+    final primaryColor = Theme.of(context).primaryColor;
 
     showDialog(
       context: context,
@@ -42,7 +46,23 @@ class ReservationDetailScreen extends StatelessWidget {
                   controller: commentController,
                   maxLines: 3,
                   enabled: !isSending,
-                  decoration: const InputDecoration(hintText: "Tulis komentar (min. 5 huruf)...", border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    hintText: "Tulis komentar (min. 5 huruf)...", 
+                    border: OutlineInputBorder()
+                  ),
+                ),
+                
+                // 2. TAMBAHKAN UI SWITCH DI SINI
+                const SizedBox(height: 10),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text("Ulasan Anonim", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  subtitle: const Text("Nama Anda akan disensor di halaman publik", style: TextStyle(fontSize: 11)),
+                  value: isAnonymous,
+                  activeColor: primaryColor,
+                  onChanged: isSending ? null : (val) {
+                    setStateDialog(() => isAnonymous = val);
+                  },
                 ),
               ],
             ),
@@ -59,18 +79,23 @@ class ReservationDetailScreen extends StatelessWidget {
                 final SharedPreferences prefs = await SharedPreferences.getInstance();
                 int userId = prefs.getInt('user_id') ?? 0;
 
+                // 3. KIRIM DATA KE API (TAMBAHKAN is_anonymous)
                 final result = await ApiServices.storeHotelReview({
                   "user_id": userId,
                   "tipe_kamar_id": reservation['tipe_kamar_id'], 
                   "rating": selectedRating,
                   "komentar": commentController.text,
+                  "is_anonymous": isAnonymous, // <--- DATA INI AKAN TERKIRIM KE LARAVEL
                 });
 
                 setStateDialog(() => isSending = false);
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(result['message']), backgroundColor: result['success'] ? Colors.green : Colors.red),
+                    SnackBar(
+                      content: Text(result['message']), 
+                      backgroundColor: result['success'] ? Colors.green : Colors.red
+                    ),
                   );
                 }
               },
@@ -249,6 +274,16 @@ class ReservationDetailScreen extends StatelessWidget {
             )
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
       ),
     );
   }

@@ -53,7 +53,7 @@ class AuthController extends Controller
             'username'  => $request->username,
             'full_name' => $request->full_name,
             'email'     => $request->email,
-            'password'  => Hash::make($request->password), 
+            'password'  => Hash::make($request->password),
             'phone'     => $request->phone,
             'address'   => $request->address,
             'otp'       => $otp
@@ -101,7 +101,7 @@ class AuthController extends Controller
             'password'    => $cachedData['password'],
             'phone'       => $cachedData['phone'],
             'address'     => $cachedData['address'],
-            'role_id'     => 2, 
+            'role_id'     => 2,
             'is_verified' => true,
         ]);
 
@@ -212,10 +212,10 @@ public function login(Request $request)
     public function profile(Request $request)
     {
         $user = $request->user();
-        
+
         // Kita gunakan url('/') agar link mengarah ke IP Laptop kamu, bukan localhost
-        $photoUrl = $user->profile_photo 
-            ? url('storage/profiles/' . $user->profile_photo) 
+        $photoUrl = $user->profile_photo
+            ? url('storage/profiles/' . $user->profile_photo)
             : "https://ui-avatars.com/api/?name=" . urlencode($user->full_name) . "&background=0D8ABC&color=fff";
 
         return response()->json([
