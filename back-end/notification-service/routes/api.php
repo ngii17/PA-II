@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Route;
 // Route untuk mengambil inbox notifikasi user
 // Taruh di luar atau dalam middleware service.auth (tapi untuk flutter, buat public saja dulu agar gampang)
 Route::get('/inbox/{userId}', [NotificationController::class, 'getNotifications']);
+Route::get('/notifications/{id}', [NotificationController::class, 'show']);
+Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 
 // Membungkus semua route dalam middleware 'service.auth' (Checklist Poin 8)
 Route::middleware(['service.auth'])->prefix('notify')->group(function () {
@@ -50,6 +53,10 @@ Route::middleware(['service.auth'])->prefix('notify')->group(function () {
     // 4. Pembayaran Gagal
     Route::post('/order-payment-failed', [NotificationController::class, 'orderPaymentFailed']);
 
+    Route::post('/broadcast/send', [NotificationController::class, 'sendMassNotification']);
+
+    Route::post('/hotel/checkin-success', [NotificationController::class, 'hotelCheckinSuccess']);
 
 
+    Route::post('/hotel/checkout-success', [NotificationController::class, 'hotelCheckoutSuccess']);
 });

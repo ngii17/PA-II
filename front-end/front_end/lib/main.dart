@@ -73,6 +73,13 @@ void _navigateToNotificationScreen() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // Fungsi untuk memperbarui waktu aktivitas terakhir ke SharedPreferences
+  void _updateLastActivity() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    // Simpan timestamp milidetik saat ini
+    await prefs.setInt('last_activity', DateTime.now().millisecondsSinceEpoch);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Memantau perubahan tema dari EventProvider (Port 8001)

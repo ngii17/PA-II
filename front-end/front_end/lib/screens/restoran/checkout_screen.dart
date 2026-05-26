@@ -28,6 +28,11 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _paymentMethod = "Transfer Bank";
+  
+  // --- TAMBAHAN STATE UNTUK LOKASI ---
+  String _deliveryType = "Meja"; // Default antar ke Meja
+  final TextEditingController _locationController = TextEditingController();
+  
   final TextEditingController _promoController = TextEditingController();
   double _discount = 0;
   String _promoName = "";
@@ -79,6 +84,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   // --- LOGIKA UTAMA PEMBAYARAN & ORDER ---
   void _payNow() async {
+    // --- VALIDASI LOKASI ---
+    if (_locationController.text.isEmpty) {
+      _showSnackBar("Mohon isi nomor $_deliveryType Anda", Colors.orange);
+      return;
+    }
+
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
     
@@ -98,6 +109,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         "fcm_token": fcmToken,
         "metode_pembayaran": _paymentMethod,
         "total_harga": _getSubtotal() - _discount,
+        "tipe_pengantaran": _deliveryType,    // <--- DATA BARU
+        "nomor_lokasi": _locationController.text, // <--- DATA BARU
         "items": items
       });
 

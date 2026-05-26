@@ -12,6 +12,7 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   late Future<Map<String, dynamic>> _inboxData;
+  int _currentUserId = 0; // Simpan userId di sini
 
   @override
   void initState() {

@@ -7,22 +7,36 @@ import '../../colors/login_constants.dart';
 class ReservationHistoryScreen extends StatefulWidget {
   const ReservationHistoryScreen({super.key});
   @override
-  State<ReservationHistoryScreen> createState() => _ReservationHistoryScreenState();
+  State<ReservationHistoryScreen> createState() =>
+      _ReservationHistoryScreenState();
 }
 
-class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
+class _ReservationHistoryScreenState
+    extends State<ReservationHistoryScreen> {
   late Future<Map<String, dynamic>> _historyData;
 
   @override
   void initState() {
     super.initState();
-    _historyData = _fetchHistory();
+    _refreshHistory();
+  }
+
+  // Refresh data
+  Future<void> _refreshHistory() async {
+    setState(() {
+      _historyData = _fetchHistory();
+    });
   }
 
   Future<Map<String, dynamic>> _fetchHistory() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final SharedPreferences prefs =
+        await SharedPreferences.getInstance();
+
     int? userId = prefs.getInt('user_id');
-    return ApiServices.getReservationHistory(userId.toString());
+
+    return ApiServices.getReservationHistory(
+      userId.toString(),
+    );
   }
 
   @override

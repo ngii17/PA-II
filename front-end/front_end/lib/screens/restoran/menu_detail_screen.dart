@@ -43,8 +43,8 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> with SingleTickerPr
     
     // Sinkronisasi jumlah porsi jika sudah ada di keranjang lokal
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
-    if (cartProvider.items.containsKey(widget.menu.id)) {
-      _localQuantity = cartProvider.items[widget.menu.id]!;
+    if (cartProvider.itemQuantities.containsKey(widget.menu.id)) {
+      _localQuantity = cartProvider.itemQuantities[widget.menu.id]!;
     }
     
     _reviewData = ApiServices.getRestoReviews(widget.menu.id);
@@ -287,6 +287,8 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> with SingleTickerPr
           ),
         ),
       ),
+      
+      // Bottom Navigation Bar untuk Aksi Order
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(25, 20, 25, 35),
         decoration: BoxDecoration(
@@ -298,7 +300,8 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> with SingleTickerPr
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Column(
-              mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text("Total Bayar", style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
                 Text("Rp ${totalBayar.toStringAsFixed(0)}", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: navyColor)),

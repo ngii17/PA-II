@@ -16,7 +16,9 @@ class ReservationDetailScreen extends StatelessWidget {
   void _showReviewDialog(BuildContext context) {
     final TextEditingController commentController = TextEditingController();
     int selectedRating = 5;
+    bool isAnonymous = false; // 1. TAMBAHKAN VARIABEL INI
     bool isSending = false;
+    final primaryColor = Theme.of(context).primaryColor;
 
     showDialog(
       context: context,
@@ -92,11 +94,13 @@ class ReservationDetailScreen extends StatelessWidget {
                 final SharedPreferences prefs = await SharedPreferences.getInstance();
                 int userId = prefs.getInt('user_id') ?? 0;
 
+                // 3. KIRIM DATA KE API (TAMBAHKAN is_anonymous)
                 final result = await ApiServices.storeHotelReview({
                   "user_id": userId,
                   "tipe_kamar_id": reservation['tipe_kamar_id'], 
                   "rating": selectedRating,
                   "komentar": commentController.text,
+                  "is_anonymous": isAnonymous, // <--- DATA INI AKAN TERKIRIM KE LARAVEL
                 });
 
                 setStateDialog(() => isSending = false);
@@ -162,6 +166,7 @@ class ReservationDetailScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
+                  // --- KOTAK STATUS ---
                   Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),

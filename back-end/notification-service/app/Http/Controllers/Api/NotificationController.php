@@ -226,4 +226,160 @@ class NotificationController extends Controller
         $body = "Transaksi untuk pesanan #RS-{$request->order_id} gagal diproses. Silakan coba lagi.";
         return $this->executeSend($request->fcm_token, $request->user_id, $title, $body, ['order_id' => $request->order_id], 'order_payment_failed');
     }
+
+    /**
+     * NOTIFIKASI BROADCAST (PROMO/EVENT)
+     */
+    public function sendBroadcast(Request $request)
+    {
+        // Validasi: Meminta daftar token (array), judul, dan isi pesan
+        $this->validateRequest($request, ['tokens', 'title', 'body']);
+
+        $tokens = $request->tokens; // Ini adalah Array of Strings
+        $successCount = 0;
+
+        foreach ($tokens as $token) {
+            // Kita gunakan fungsi executeSend yang sudah ada
+            // user_id kita set 0 atau null untuk broadcast umum jika tidak spesifik
+            $send = $this->fcm->send($token, $request->title, $request->body, ['type' => 'promo']);
+            
+            if ($send) {
+                $successCount++;
+                // Opsional: Catat ke log agar muncul di inbox masing-masing user
+                // Tapi ini butuh mapping token ke user_id. 
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Broadcast terkirim ke $successCount perangkat."
+        ]);
+    }
+
+
+    // Ambil Detail
+public function show(Request $request, $id)
+{
+    $userId = $request->query('user_id'); // Kita kirim user_id via query param
+    $notif = NotifLog::find($id);
+
+    if (!$notif) return response()->json(['status' => 'error', 'message' => 'Notifikasi tidak ditemukan'], 404);
+    
+    // Validasi Pemilik
+    if ($notif->user_id != $userId) {
+        return response()->json(['status' => 'error', 'message' => 'Akses dilarang'], 403);
+    }
+
+    return response()->json([
+        'status' => 'success',
+        'message' => 'Data ditemukan',
+        'data' => $notif
+    ], 200);
+}
+
+// Tandai Dibaca
+public function markAsRead(Request $request, $id)
+{
+    $userId = $request->query('user_id');
+    $notif = NotifLog::find($id);
+
+    if ($notif && $notif->user_id == $userId) {
+        $notif->update(['is_read' => true]);
+        return response()->json(['status' => 'success', 'message' => 'Telah dibaca']);
+    }
+    return response()->json(['status' => 'error', 'message' => 'Gagal update'], 400);
+}
+
+// Hapus Notifikasi
+public function destroy(Request $request, $id)
+{
+    $userId = $request->query('user_id');
+    $notif = NotifLog::find($id);
+
+    if ($notif && $notif->user_id == $userId) {
+        $notif->delete();
+        return response()->json(['status' => 'success', 'message' => 'Berhasil dihapus']);
+    }
+    return response()->json(['status' => 'error', 'message' => 'Gagal menghapus'], 403);
+}
+
+
+public function sendMassNotification(Request $request) 
+{
+    // Kita terima array: [['user_id' => 1, 'token' => '...'], dst]
+    $recipients = $request->recipients; 
+    $title = $request->title;
+    $body = $request->body;
+
+    foreach ($recipients as $target) {
+        // 1. Kirim Pop-up
+        $this->fcm->send($target['token'], $title, $body, ['type' => 'broadcast']);
+
+        // 2. Simpan ke Log (Agar muncul di Kotak Masuk/Inbox user)
+        \App\Models\NotifLog::create([
+            'user_id'   => $target['user_id'],
+            'type'      => 'broadcast',
+            'title'     => $title,
+            'body'      => $body,
+            'fcm_token' => $target['token'],
+            'status'    => 'success',
+            'sent_at'   => now(),
+        ]);
+    }
+
+    return response()->json(['status' => 'success', 'message' => 'Broadcast sukses']);
+}
+
+
+
+    /**
+     * NOTIFIKASI SAAT TAMU RESMI CHECK-IN (DIUBAH OLEH ADMIN)
+     */
+    public function hotelCheckinSuccess(Request $request)
+    {
+        // 1. Validasi input agar tidak error saat merakit pesan
+        $this->validateRequest($request, ['fcm_token', 'user_id', 'room_number']);
+
+        // 2. Susun Judul & Pesan yang lebih hangat (Warm Greeting)
+        $title = "Check-in Berhasil! 🏨";
+        $body  = "Selamat datang di Purnama Hotel! 🎉 Anda resmi check-in di Kamar {$request->room_number}. Silakan nikmati fasilitas terbaik kami, semoga istirahat Anda sangat menyenangkan.";
+        
+        // 3. Kirim dan Simpan Log
+        // Kita gunakan 'checkin_reminder' sebagai tipe log agar ikon hotel otomatis muncul di Flutter
+        return $this->executeSend(
+            $request->fcm_token, 
+            $request->user_id, 
+            $title, 
+            $body, 
+            [
+                'type' => 'hotel_checkin', 
+                'room_number' => (string)$request->room_number,
+                'click_action' => 'FLUTTER_NOTIFICATION_CLICK' // Memastikan klik mengarah ke aplikasi
+            ], 
+            'checkin_reminder' 
+        );
+    }
+
+
+    public function hotelCheckoutSuccess(Request $request)
+    {
+        // Validasi input
+        $this->validateRequest($request, ['fcm_token', 'user_id', 'reservation_id']);
+
+        $title = "Check-out Berhasil! ✨";
+        $body  = "Terima kasih telah menginap di Purnama Hotel. Pesanan #INV-{$request->reservation_id} telah selesai. Sampai jumpa kembali!";
+        
+        return $this->executeSend(
+            $request->fcm_token, 
+            $request->user_id, 
+            $title, 
+            $body, 
+            ['type' => 'hotel_checkout', 'reservation_id' => (string)$request->reservation_id], 
+            'checkout_reminder' // Tipe ini agar ikon pintu keluar muncul di Flutter
+        );
+    }
+
+
+    
+
 }

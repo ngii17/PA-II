@@ -127,6 +127,11 @@ class OrderDetailScreen extends StatelessWidget {
     bool isPaid = order['status_pembayaran_id'].toString() == '2';
     String statusText = isPaid ? "BERHASIL DIBAYAR" : "MENUNGGU PEMBAYARAN";
 
+    // --- LOGIKA LOKASI PENGANTARAN ---
+    String deliveryType = order['tipe_pengantaran'] ?? "Meja";
+    String locationNum = order['nomor_lokasi'] ?? "-";
+    IconData locationIcon = deliveryType == "Kamar" ? Icons.bed : Icons.table_restaurant;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       extendBodyBehindAppBar: true,

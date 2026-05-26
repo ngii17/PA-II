@@ -21,7 +21,14 @@ class _RoomListScreenState extends State<RoomListScreen> {
   @override
   void initState() {
     super.initState();
-    _roomData = ApiServices.getRoomTypes();
+    _loadData(); // Panggil fungsi muat data
+  }
+
+  // Fungsi untuk memuat ulang data
+  void _loadData() {
+    setState(() {
+      _roomData = ApiServices.getRoomTypes();
+    });
   }
 
   @override
