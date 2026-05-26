@@ -3,11 +3,11 @@
 namespace App\Models\event;
 
 use Illuminate\Database\Eloquent\Model;
-// Import Model Menu agar bisa dikenali
 use App\Models\restoran\Menu;
 
 class Event extends Model
 {
+
     protected $table = 'events';
 
     protected $fillable = [
@@ -22,6 +22,9 @@ class Event extends Model
         'deskripsi',
     ];
 
+    // Kolom yang harus diperlakukan sebagai tanggal oleh Laravel
+    protected $dates = ['deleted_at'];
+
     protected $casts = [
         'is_active' => 'boolean',
     ];
@@ -31,8 +34,11 @@ class Event extends Model
      * Menggunakan tabel jembatan: event_menu
      */
     public function menus()
-{
-    // Kita ubah 'event_restoran_id' menjadi 'event_id' sesuai migrasi terbaru
-    return $this->belongsToMany(\App\Models\restoran\Menu::class, 'event_menu', 'event_id', 'menu_id');
-}
+    {
+        // 3. Tambahkan withPivot agar kamu bisa memanggil 'harga_khusus'
+        // yang ada di tabel jembatan (pivot)
+        return $this->belongsToMany(\App\Models\restoran\Menu::class, 'event_menu', 'event_id', 'menu_id')
+                    ->withPivot('harga_khusus', 'is_active')
+                    ->withTimestamps();
+    }
 }

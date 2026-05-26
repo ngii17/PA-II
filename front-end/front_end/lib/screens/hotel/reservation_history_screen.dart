@@ -54,29 +54,13 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
             children: [
               // --- TAMBAHAN: BANNER EVENT DI ATAS RIWAYAT ---
               const EventHeader(),
-
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.all(15),
                   itemCount: history.length,
                   itemBuilder: (context, index) {
                     final item = history[index];
-                    
-                    Color statusColor;
-                    String statusLabel;
-                    switch (item['status_reservasi_id']) {
-                      case 1:
-                        statusColor = Colors.orange;
-                        statusLabel = "MENUNGGU PEMBAYARAN";
-                        break;
-                      case 2:
-                        statusColor = Colors.green;
-                        statusLabel = "SUDAH DIBAYAR";
-                        break;
-                      default:
-                        statusColor = Colors.red;
-                        statusLabel = "BATAL / GAGAL";
-                    }
+                    String statusLabel = item['status'] == 1 ? "Aktif" : "Selesai";
+                    Color statusColor = item['status'] == 1 ? Colors.green : Colors.grey;
 
                     return InkWell(
                       onTap: () {
@@ -85,7 +69,7 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
                           MaterialPageRoute(
                             builder: (context) => ReservationDetailScreen(reservation: item),
                           ),
-                        );
+                        ).then((_) => setState(() => _historyData = _fetchHistory()));
                       },
                       child: Card(
                         elevation: 4,
@@ -100,7 +84,7 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    item['nama_tipe'] ?? "Kamar",
+                                    item['nama_tipe'] ?? "Tipe Kamar Tidak Tersedia",
                                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                   ),
                                   Container(
@@ -108,6 +92,7 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
                                     decoration: BoxDecoration(
                                       color: statusColor.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(5),
+                                      border: Border.all(color: statusColor.withOpacity(0.5)),
                                     ),
                                     child: Text(
                                       statusLabel,
@@ -117,11 +102,23 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
                                 ],
                               ),
                               const Divider(height: 25),
-                              Text("Check-in: ${item['tgl_checkin']}"),
+                              Row(
+                                children: [
+                                  const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                                  const SizedBox(width: 5),
+                                  Text("Check-in: ${item['tgl_checkin']}"),
+                                ],
+                              ),
                               const SizedBox(height: 10),
-                              Text(
-                                "Total: Rp ${double.parse(item['total_harga'].toString()).toStringAsFixed(0)}",
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor), // Warna teks total sesuai tema
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Total: Rp ${double.parse(item['total_harga'].toString()).toStringAsFixed(0)}",
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor),
+                                  ),
+                                  const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
+                                ],
                               ),
                             ],
                           ),

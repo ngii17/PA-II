@@ -135,7 +135,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
-                                              "${item['jumlah']}x ${item['menu']['nama_menu']}"),
+                                              "${item['jumlah']}x ${item['menu']?['nama_menu'] ?? 'Menu Tidak Tersedia (Arsip)'}"),
                                           Text(
                                               "Rp ${double.parse(item['harga_at_porsi'].toString()).toStringAsFixed(0)}"),
                                         ],

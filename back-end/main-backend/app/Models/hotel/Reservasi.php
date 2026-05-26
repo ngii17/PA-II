@@ -3,10 +3,12 @@
 namespace App\Models\hotel;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Reservasi extends Model
 {
-    // Nama tabel di database pgAdmin
+    use SoftDeletes;
+
     protected $table = 'reservasi';
 
     // Daftar kolom yang diizinkan untuk diisi secara massal
@@ -14,7 +16,6 @@ class Reservasi extends Model
         'user_id',
         'tipe_kamar_id',
         'kamar_id',
-        'fcm_token',           // <--- TAMBAHAN: Untuk menyimpan identitas HP User
         'tgl_checkin',
         'tgl_checkout',
         'total_malam',
@@ -25,25 +26,25 @@ class Reservasi extends Model
     ];
 
     /**
-     * RELASI: Satu reservasi memiliki banyak data tamu
+     * TAMBAHKAN RELASI INI (WAJIB)
+     * Agar data Nama Tamu & NIK dari tabel detail_reservasi bisa terbaca
      */
-    public function details()
+    public function kamarFisik()
     {
-        return $this->hasMany(DetailReservasi::class, 'reservasi_id');
+        return $this->belongsTo(Kamar::class, 'kamar_id');
     }
 
-    /**
-     * RELASI: Reservasi ini memesan tipe kamar tertentu
-     */
+    public function statusReservasi()
+    {
+        return $this->belongsTo(StatusReservasi::class, 'status_reservasi_id');
+    }
+
     public function tipeKamar()
     {
         return $this->belongsTo(TipeKamar::class, 'tipe_kamar_id');
     }
 
-    /**
-     * RELASI: Nomor kamar fisik yang didapatkan (diisi setelah bayar)
-     */
-    public function kamarFisik()
+    public function kamar()
     {
         return $this->belongsTo(Kamar::class, 'kamar_id');
     }
