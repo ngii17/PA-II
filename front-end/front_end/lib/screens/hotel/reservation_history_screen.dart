@@ -43,7 +43,6 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
       ),
-      // --- TAMBAHAN: REFRESH INDICATOR AGAR BISA TARIK KE BAWAH ---
       body: RefreshIndicator(
         onRefresh: _refreshHistory,
         color: primaryColor,
@@ -55,7 +54,7 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
             }
 
             if (snapshot.hasError || snapshot.data?['success'] == false) {
-              return ListView( // Gunakan ListView agar tetap bisa di-refresh saat error
+              return ListView(
                 children: const [
                   SizedBox(height: 100),
                   Center(child: Text("Gagal mengambil riwayat.")),
@@ -65,89 +64,122 @@ class _ReservationHistoryScreenState extends State<ReservationHistoryScreen> {
 
             List<dynamic> history = snapshot.data?['data'] ?? [];
 
-          return Column(
-            children: [
-              // --- TAMBAHAN: BANNER EVENT DI ATAS RIWAYAT ---
-              const EventHeader(),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: history.length,
-                  itemBuilder: (context, index) {
-                    final item = history[index];
-                    String statusLabel = item['status'] == 1 ? "Aktif" : "Selesai";
-                    Color statusColor = item['status'] == 1 ? Colors.green : Colors.grey;
+            return Column(
+              children: [
+                const EventHeader(),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(15),
+                    itemCount: history.length,
+                    itemBuilder: (context, index) {
+                      final item = history[index];
 
-                    return InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ReservationDetailScreen(reservation: item),
-                          ),
-                        ).then((_) => setState(() => _historyData = _fetchHistory()));
-                      },
-                      child: Card(
-                        elevation: 4,
-                        margin: const EdgeInsets.only(bottom: 15),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(15),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    item['nama_tipe'] ?? "Tipe Kamar Tidak Tersedia",
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(5),
-                                      border: Border.all(color: statusColor.withOpacity(0.5)),
+                      // ==========================================
+                      // --- FIX LOGIKA STATUS: SINKRON DENGAN DB ---
+                      // ==========================================
+                      int statusId = int.tryParse(item['status_reservasi_id'].toString()) ?? 1;
+                      
+                      String statusLabel;
+                      Color statusColor;
+
+                      switch (statusId) {
+                        case 1:
+                          statusLabel = "PENDING";
+                          statusColor = Colors.orange;
+                          break;
+                        case 2:
+                          statusLabel = "TERBAYAR";
+                          statusColor = Colors.blue;
+                          break;
+                        case 3:
+                          statusLabel = "SUDAH CHECK-IN";
+                          statusColor = Colors.green;
+                          break;
+                        case 4:
+                          statusLabel = "SELESAI";
+                          statusColor = Colors.grey;
+                          break;
+                        case 5:
+                          statusLabel = "DIBATALKAN";
+                          statusColor = Colors.red;
+                          break;
+                        default:
+                          statusLabel = "UNKNOWN";
+                          statusColor = Colors.black;
+                      }
+                      // ==========================================
+
+                      return InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ReservationDetailScreen(reservation: item),
+                            ),
+                          ).then((_) => _refreshHistory());
+                        },
+                        child: Card(
+                          elevation: 4,
+                          margin: const EdgeInsets.only(bottom: 15),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(15),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      item['nama_tipe'] ?? "Kamar",
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                     ),
-                                    child: Text(
-                                      statusLabel,
-                                      style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(5),
+                                        border: Border.all(color: statusColor.withOpacity(0.5)),
+                                      ),
+                                      child: Text(
+                                        statusLabel,
+                                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10),
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const Divider(height: 25),
-                              Row(
-                                children: [
-                                  const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                                  const SizedBox(width: 5),
-                                  Text("Check-in: ${item['tgl_checkin']}"),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "Total: Rp ${double.parse(item['total_harga'].toString()).toStringAsFixed(0)}",
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor),
-                                  ),
-                                  const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
-                                ],
-                              ),
-                            ],
+                                  ],
+                                ),
+                                const Divider(height: 25),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                                    const SizedBox(width: 5),
+                                    Text("Check-in: ${item['tgl_checkin']}"),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      "Total: Rp ${double.parse(item['total_harga'].toString()).toStringAsFixed(0)}",
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor),
+                                    ),
+                                    const Icon(Icons.arrow_forward_ios, size: 12, color: Colors.grey),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
-    )
-  );
-}
+    );
+  }
 }

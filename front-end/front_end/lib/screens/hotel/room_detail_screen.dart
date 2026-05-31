@@ -143,7 +143,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                       }),
                                     ),
                                     const SizedBox(width: 10),
-                                    const Text("Verified Guest", style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                    Text(
+  rev['nama_user'] ?? "Verified Guest", // Mengambil data nama_user dari JSON Backend
+  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+),
                                   ],
                                 ),
                                 const SizedBox(height: 8),

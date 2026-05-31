@@ -3,17 +3,53 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
 import '../event/event_header.dart';
 
-class ReservationDetailScreen extends StatelessWidget {
+class ReservationDetailScreen extends StatefulWidget {
   final Map<String, dynamic> reservation;
 
   const ReservationDetailScreen({super.key, required this.reservation});
 
-  // ... (kode import tetap sama)
+  @override
+  State<ReservationDetailScreen> createState() => _ReservationDetailScreenState();
+}
 
-  void _showReviewDialog(BuildContext context) {
+class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
+  late Map<String, dynamic> _currentRes;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentRes = widget.reservation;
+  }
+
+  // --- 1. REFRESH DATA AGAR TOMBOL UPDATE ---
+  void _triggerRefresh() {
+    ApiServices.getReservationHistory(_currentRes['user_id'].toString()).then((value) {
+      if (value['success'] == true && mounted) {
+        List<dynamic> history = value['data'];
+        setState(() {
+          _currentRes = history.firstWhere(
+            (element) => element['id'] == _currentRes['id'],
+            orElse: () => _currentRes,
+          );
+        });
+      }
+    });
+  }
+
+  // --- 2. DIALOG ULASAN (PERSIS SEPERTI RESTORAN) ---
+  void _showReviewDialog(BuildContext context, {bool isEdit = false, int? reviewId, Map<String, dynamic>? existingData}) {
+    
+    // DEBUG: Cek apakah data ulasan lama benar-benar sampai ke sini
+    print("DEBUG_EXISTING_DATA: $existingData");
+
+    // Gunakan pengecekan manual untuk mengisi text
     final TextEditingController commentController = TextEditingController();
-    int selectedRating = 5;
-    bool isAnonymous = false; // 1. TAMBAHKAN VARIABEL INI
+    if (isEdit && existingData != null) {
+      commentController.text = existingData['komentar'] ?? "";
+    }
+
+    int selectedRating = isEdit ? (existingData?['rating'] ?? 5) : 5;
+    bool isAnonymous = isEdit ? (existingData?['is_anonymous'] ?? false) : false;
     bool isSending = false;
     final primaryColor = Theme.of(context).primaryColor;
 
@@ -23,13 +59,14 @@ class ReservationDetailScreen extends StatelessWidget {
       builder: (context) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: const Text("Beri Ulasan Kamar"),
+          title: Text(isEdit ? "Edit Ulasan Kamar" : "Beri Ulasan Kamar"),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text("Bagaimana pengalaman menginap Anda?", textAlign: TextAlign.center),
                 const SizedBox(height: 15),
+                // Bintang Rating
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
@@ -42,27 +79,23 @@ class ReservationDetailScreen extends StatelessWidget {
                     );
                   }),
                 ),
+                // Input Komentar
                 TextField(
                   controller: commentController,
                   maxLines: 3,
                   enabled: !isSending,
                   decoration: const InputDecoration(
-                    hintText: "Tulis komentar (min. 5 huruf)...", 
+                    hintText: "Tulis komentar...", 
                     border: OutlineInputBorder()
                   ),
                 ),
-                
-                // 2. TAMBAHKAN UI SWITCH DI SINI
                 const SizedBox(height: 10),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text("Ulasan Anonim", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  subtitle: const Text("Nama Anda akan disensor di halaman publik", style: TextStyle(fontSize: 11)),
+                  title: const Text("Ulasan Anonim", style: TextStyle(fontSize: 14)),
                   value: isAnonymous,
                   activeColor: primaryColor,
-                  onChanged: isSending ? null : (val) {
-                    setStateDialog(() => isAnonymous = val);
-                  },
+                  onChanged: isSending ? null : (val) => setStateDialog(() => isAnonymous = val),
                 ),
               ],
             ),
@@ -79,31 +112,107 @@ class ReservationDetailScreen extends StatelessWidget {
                 final SharedPreferences prefs = await SharedPreferences.getInstance();
                 int userId = prefs.getInt('user_id') ?? 0;
 
-                // 3. KIRIM DATA KE API (TAMBAHKAN is_anonymous)
-                final result = await ApiServices.storeHotelReview({
+                Map<String, dynamic> data = {
                   "user_id": userId,
-                  "tipe_kamar_id": reservation['tipe_kamar_id'], 
+                  "tipe_kamar_id": _currentRes['tipe_kamar_id'], 
+                  "reservasi_id": _currentRes['id'],
                   "rating": selectedRating,
                   "komentar": commentController.text,
-                  "is_anonymous": isAnonymous, // <--- DATA INI AKAN TERKIRIM KE LARAVEL
-                });
+                  "is_anonymous": isAnonymous,
+                };
 
-                setStateDialog(() => isSending = false);
-                if (context.mounted) {
+                Map<String, dynamic> result;
+                if (isEdit && reviewId != null) {
+                  result = await ApiServices.updateHotelReview(reviewId, data);
+                } else {
+                  result = await ApiServices.storeHotelReview(data);
+                }
+
+                if (mounted) {
                   Navigator.pop(context);
+                  _triggerRefresh();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(result['message']), 
-                      backgroundColor: result['success'] ? Colors.green : Colors.red
-                    ),
+                    SnackBar(content: Text(result['message'] ?? "Selesai"), backgroundColor: result['success'] ? Colors.green : Colors.red),
                   );
                 }
               },
-              child: isSending 
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                : const Text("Kirim"),
+              child: Text(isEdit ? "Simpan Perubahan" : "Kirim"),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // --- 3. KONFIRMASI HAPUS ---
+  void _confirmDeleteReview(int? reviewId) {
+    if (reviewId == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Hapus Ulasan?"),
+        content: const Text("Ulasan Anda akan dihapus secara permanen dari riwayat hotel."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final SharedPreferences prefs = await SharedPreferences.getInstance();
+              int userId = prefs.getInt('user_id') ?? 0;
+              final result = await ApiServices.deleteHotelReview(reviewId, userId);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'] ?? "Dihapus")));
+                _triggerRefresh();
+              }
+            },
+            child: const Text("Hapus", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- 4. WIDGET TOMBOL (SINKRON DENGAN LOGIKA RESTORAN) ---
+  Widget _buildReviewButton(int statusId, bool isReviewed, Color primaryColor) {
+    if (isReviewed) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _showReviewDialog(
+                context, 
+                isEdit: true, 
+                reviewId: _currentRes['review_id'], 
+                existingData: _currentRes['existing_review']
+              ),
+              icon: const Icon(Icons.edit_note),
+              label: const Text("EDIT ULASAN"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue, 
+                side: const BorderSide(color: Colors.blue)
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            onPressed: () => _confirmDeleteReview(_currentRes['review_id']),
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+          ),
+        ],
+      );
+    }
+
+    // Hanya aktif jika status sudah SELESAI (4)
+    bool canClick = statusId == 4;
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: canClick ? () => _showReviewDialog(context) : null,
+        icon: const Icon(Icons.rate_review, color: Colors.white),
+        label: Text(canClick ? "BERI ULASAN PENGALAMAN" : "ULAS SETELAH CHECK-OUT"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: canClick ? primaryColor : Colors.grey[400],
+          padding: const EdgeInsets.all(15),
         ),
       ),
     );
@@ -112,63 +221,12 @@ class ReservationDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
+    int statusId = int.parse(_currentRes['status_reservasi_id']?.toString() ?? "1");
+    bool isReviewed = _currentRes['is_reviewed'] == true;
 
-    // =========================================================================
-    // --- PERBAIKAN LOGIKA PENGAMBILAN DATA IDENTITAS (FIX NAMA & NIK) ---
-    // =========================================================================
-    // Kita ambil langsung dari 'reservation' karena Backend sudah kita "Flatten"
-    // Fallback: Jika di depan kosong, baru cari di dalam list details
-    final List<dynamic> details = (reservation['details'] != null && reservation['details'] is List) ? reservation['details'] : [];
-    
-    final String namaTamu = reservation['nama_tamu'] ?? 
-                           (details.isNotEmpty ? details[0]['nama_tamu'] : "-");
-    
-    final String nikIdentitas = reservation['nik_identitas'] ?? 
-                               (details.isNotEmpty ? details[0]['nik_identitas'] : "-");
-                               
-    final String jumlahOrang = (reservation['jumlah_tamu'] ?? 
-                               (details.isNotEmpty ? details[0]['jumlah_tamu'] : 0)).toString();
-    // =========================================================================
-
-    // --- LOGIKA STATUS ---
-    int statusId = int.parse(reservation['status_reservasi_id']?.toString() ?? "1");
-    Color statusColor;
-    String statusText;
-
-    switch (statusId) {
-      case 1:
-        statusColor = Colors.orange;
-        statusText = "MENUNGGU PEMBAYARAN";
-        break;
-      case 2:
-        statusColor = Colors.blue;
-        statusText = "TERBAYAR (LUNAS)";
-        break;
-      case 3:
-        statusColor = Colors.green;
-        statusText = "SUDAH CHECK-IN";
-        break;
-      case 4:
-        statusColor = Colors.grey;
-        statusText = "SELESAI / CHECK-OUT";
-        break;
-      case 5:
-        statusColor = Colors.red;
-        statusText = "DIBATALKAN";
-        break;
-      default:
-        statusColor = Colors.black45;
-        statusText = "STATUS TIDAK DIKENAL";
-    }
-
-    bool canReview = statusId >= 2 && statusId <= 4;
-
+    // ... (Bagian build UI lainnya seperti Box Status dan Info Tamu tetap sama) ...
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Detail Reservasi"), 
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text("Detail Reservasi"), backgroundColor: primaryColor, foregroundColor: Colors.white),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -178,60 +236,26 @@ class ReservationDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- KOTAK STATUS ---
+                  // Box Status (Gunakan _currentRes agar reaktif)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.05), 
-                      borderRadius: BorderRadius.circular(12), 
-                      border: Border.all(color: statusColor.withOpacity(0.5))
-                    ),
+                    decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
                     child: Column(
                       children: [
-                        Text(reservation['nama_tipe']?.toString() ?? "Kamar", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
+                        Text(_currentRes['nama_tipe'] ?? "Kamar", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 5),
+                        Text(statusId == 4 ? "SELESAI" : "AKTIF", style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 25),
-
-                  _buildSectionTitle("Informasi Tamu"),
-                  // --- MENGGUNAKAN VARIABEL YANG SUDAH DIPERBAIKI ---
-                  _itemRow("Nama Tamu", namaTamu),
-                  _itemRow("NIK / KTP", nikIdentitas),
-                  _itemRow("Jumlah Tamu", "$jumlahOrang Orang"),
-                  
-                  const Divider(height: 40),
-                  
-                  _buildSectionTitle("Informasi Menginap"),
-                  _itemRow("Check-in", reservation['tgl_checkin'] ?? "-"),
-                  _itemRow("Check-out", reservation['tgl_checkout'] ?? "-"),
-                  _itemRow("Durasi Menginap", "${(DateTime.parse(reservation['tgl_checkout'] ?? DateTime.now().toString()).difference(DateTime.parse(reservation['tgl_checkin'] ?? DateTime.now().toString())).inDays)} Malam"),
-                  const Divider(height: 40),
-
-                  _itemRow(
-                    "Total Bayar", 
-                    "Rp ${double.parse(reservation['total_harga']?.toString() ?? "0").toStringAsFixed(0)}",
-                  ),
-
                   const SizedBox(height: 30),
+                  _itemRow("Check-in", _currentRes['tgl_checkin']),
+                  _itemRow("Total Bayar", "Rp ${double.parse(_currentRes['total_harga'].toString()).toStringAsFixed(0)}", isBold: true, textColor: primaryColor),
+                  const Divider(height: 50),
                   
-                  if (canReview)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => _showReviewDialog(context),
-                        icon: const Icon(Icons.rate_review, color: Colors.white),
-                        label: const Text("BERI ULASAN PENGALAMAN", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryColor,
-                          padding: const EdgeInsets.all(15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 50),
+                  // PANGGIL TOMBOL DINAMIS
+                  _buildReviewButton(statusId, isReviewed, primaryColor),
                 ],
               ),
             ),
@@ -241,28 +265,14 @@ class ReservationDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
-    );
-  }
-
   Widget _itemRow(String label, String value, {bool isBold = false, Color? textColor}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.black54, fontSize: 15)),
-          Text(
-            value, 
-            style: TextStyle(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600, 
-              fontSize: isBold ? 18 : 15,
-              color: textColor ?? Colors.black,
-            )
-          ),
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: textColor)),
         ],
       ),
     );

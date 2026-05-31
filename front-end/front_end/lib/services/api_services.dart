@@ -19,13 +19,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 class ApiServices {
   // 1. Alamat Server Auth (Mikroservices - Port 8000)
-  static const String _authUrl = "http://10.187.82.132:8000/api";
+  static const String _authUrl = "http://10.106.80.132:8000/api";
   
   // 2. Alamat Server Bisnis (Main Backend - Port 8001)
-  static const String _hotelUrl = "http://10.187.82.132:8001/api";
+  static const String _hotelUrl = "http://10.106.80.132:8001/api";
 
   // 3. Alamat Server Notifikasi (Port 8002)
-  static const String _notifUrl = "http://10.187.82.132:8002/api";
+  static const String _notifUrl = "http://10.106.80.132:8002/api";
 
   // ==========================================
   // FUNGSI KHUSUS HOTEL (Server Port 8001)
@@ -395,22 +395,26 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
   // ==========================================
 
   // ==========================================================
-  // 4. PERBAIKAN KIRIM ULASAN (Wajib Pakai Token)
+  // 13 PERBAIKAN KIRIM ULASAN (Wajib Pakai Token)
   // ==========================================================
   static Future<Map<String, dynamic>> storeHotelReview(Map<String, dynamic> data) async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('auth_token');
+      // Konsisten menggunakan 'access_token' sesuai hasil login
+      String? token = prefs.getString('access_token');
 
       final response = await http.post(
-        Uri.parse("$_hotelUrl/review/hotel"),
+        Uri.parse("$_hotelUrl/review/hotel"), // Menembak Port 8001
         headers: {
           'Content-Type': 'application/json', 
           'Accept': 'application/json',
-          'Authorization': 'Bearer $token', // Tambahkan ini
+          'Authorization': 'Bearer $token',
         },
+        // Data wajib berisi: user_id, tipe_kamar_id, reservasi_id, rating, komentar, is_anonymous
         body: jsonEncode(data),
       );
+
+      print("LOG_REVIEW_HOTEL: ${response.statusCode} - ${response.body}");
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Gagal kirim ulasan hotel: $e'};
@@ -421,24 +425,45 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
   static Future<Map<String, dynamic>> storeRestoReview(Map<String, dynamic> data) async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('auth_token');
+      String? token = prefs.getString('access_token'); 
 
       final response = await http.post(
-        Uri.parse("$_hotelUrl/review/restoran"),
+        Uri.parse("$_hotelUrl/review/restoran"), // Menembak Port 8001
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
+        // Data wajib berisi: user_id, menu_id, pesanan_menu_id, rating, komentar, is_anonymous
         body: jsonEncode(data),
       );
+
+      print("LOG_REVIEW_RESTO: ${response.statusCode} - ${response.body}");
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Gagal kirim ulasan resto: $e'};
     }
   }
 
-  // 15. Ambil Ulasan Hotel (Untuk Umum)
+// Edit Ulasan
+  static Future<Map<String, dynamic>> updateRestoReview(int id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse("$_hotelUrl/review/restoran/$id"),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+    return jsonDecode(response.body);
+  }
+
+  // Hapus Ulasan
+  static Future<Map<String, dynamic>> deleteRestoReview(int id, int userId) async {
+    final response = await http.delete(
+      Uri.parse("$_hotelUrl/review/restoran/$id?user_id=$userId"),
+    );
+    return jsonDecode(response.body);
+  }
+  
+    // 15. Ambil Ulasan Hotel (Untuk Umum)
   static Future<Map<String, dynamic>> getHotelReviews(int tipeKamarId) async {
     try {
       final response = await http.get(Uri.parse("$_hotelUrl/review/hotel/$tipeKamarId"));
@@ -558,6 +583,22 @@ static Future<Map<String, dynamic>> deleteNotification(int id, int userId) async
   return jsonDecode(response.body);
 }
 
+// 22. Edit Ulasan Hotel
+  static Future<Map<String, dynamic>> updateHotelReview(int id, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse("$_hotelUrl/review/hotel/$id"),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(data),
+    );
+    return jsonDecode(response.body);
+  }
 
+  // 23. Hapus Ulasan Hotel
+  static Future<Map<String, dynamic>> deleteHotelReview(int id, int userId) async {
+    final response = await http.delete(
+      Uri.parse("$_hotelUrl/review/hotel/$id?user_id=$userId"),
+    );
+    return jsonDecode(response.body);
+  }
 
 }

@@ -3,15 +3,46 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
 import '../event/event_header.dart';
 
-class OrderDetailScreen extends StatelessWidget {
+class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> order;
 
   const OrderDetailScreen({super.key, required this.order});
 
-  // --- FUNGSI POP-UP FORM ULASAN MAKANAN ---
-  void _showRestoReviewDialog(BuildContext context, int menuId, String menuName) {
-    final TextEditingController commentController = TextEditingController();
-    int selectedRating = 5;
+  @override
+  State<OrderDetailScreen> createState() => _OrderDetailScreenState();
+}
+
+class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  late Map<String, dynamic> _currentOrder;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentOrder = widget.order;
+  }
+
+  // --- 1. FUNGSI UNTUK REFRESH DATA ---
+  void _triggerParentRefresh() {
+    ApiServices.getRestaurantOrderHistory(_currentOrder['user_id'].toString())
+        .then((value) {
+      if (value['success'] == true && mounted) {
+        List<dynamic> history = value['data'];
+        setState(() {
+          _currentOrder = history.firstWhere(
+              (element) => element['id'] == _currentOrder['id'],
+              orElse: () => _currentOrder);
+        });
+      }
+    });
+  }
+
+  // --- 2. FUNGSI DIALOG ULASAN (SIMPAN/EDIT) ---
+  void _showRestoReviewDialog(BuildContext context, int menuId, String menuName,
+      {bool isEdit = false, int? reviewId, Map<String, dynamic>? existingData}) {
+    final TextEditingController commentController = TextEditingController(
+        text: isEdit ? (existingData?['komentar'] ?? "") : "");
+    int selectedRating = isEdit ? (existingData?['rating'] ?? 5) : 5;
+    bool isAnonymous = isEdit ? (existingData?['is_anonymous'] ?? false) : false;
     bool isSending = false;
 
     showDialog(
@@ -20,95 +51,170 @@ class OrderDetailScreen extends StatelessWidget {
       builder: (context) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: Text("Ulas $menuName"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("Bagaimana rasa makanan ini?", textAlign: TextAlign.center),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  return IconButton(
-                    icon: Icon(
-                      index < selectedRating ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
-                    ),
-                    onPressed: isSending ? null : () => setStateDialog(() => selectedRating = index + 1),
-                  );
-                }),
-              ),
-              TextField(
-                controller: commentController,
-                maxLines: 3,
-                enabled: !isSending,
-                decoration: const InputDecoration(
-                  hintText: "Tulis ulasan rasa (min. 5 huruf)...",
-                  border: OutlineInputBorder(),
+          title: Text(isEdit ? "Edit Ulasan $menuName" : "Ulas $menuName"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Bagaimana rasa makanan ini?"),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      icon: Icon(
+                        index < selectedRating ? Icons.star : Icons.star_border,
+                        color: Colors.amber,
+                      ),
+                      onPressed: isSending ? null : () => setStateDialog(() => selectedRating = index + 1),
+                    );
+                  }),
                 ),
-              ),
-            ],
+                TextField(
+                  controller: commentController,
+                  maxLines: 3,
+                  enabled: !isSending,
+                  decoration: const InputDecoration(
+                      hintText: "Tulis ulasan...", border: OutlineInputBorder()),
+                ),
+                SwitchListTile(
+                  title: const Text("Ulas sebagai Anonim", style: TextStyle(fontSize: 12)),
+                  value: isAnonymous,
+                  activeColor: Theme.of(context).primaryColor,
+                  onChanged: isSending ? null : (val) => setStateDialog(() => isAnonymous = val),
+                ),
+              ],
+            ),
           ),
           actions: [
-            TextButton(
-              onPressed: isSending ? null : () => Navigator.pop(context), 
-              child: const Text("Batal")
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
             ElevatedButton(
               onPressed: isSending ? null : () async {
-                if (commentController.text.trim().length < 5) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Komentar minimal 5 huruf"))
-                  );
-                  return;
-                }
-
                 setStateDialog(() => isSending = true);
                 final SharedPreferences prefs = await SharedPreferences.getInstance();
                 int userId = prefs.getInt('user_id') ?? 0;
 
-                final result = await ApiServices.storeRestoReview({
+                // ============================================================
+                // --- PERBAIKAN: SERTAKAN ID TRANSAKSI (SINKRON DENGAN DB) ---
+                // ============================================================
+                Map<String, dynamic> data = {
                   "user_id": userId,
                   "menu_id": menuId,
+                  "pesanan_menu_id": _currentOrder['id'], // <--- KUNCI: Harus kirim ID Nota
                   "rating": selectedRating,
                   "komentar": commentController.text,
-                });
+                  "is_anonymous": isAnonymous,
+                };
+                // ============================================================
 
-                setStateDialog(() => isSending = false);
+                Map<String, dynamic> result = isEdit && reviewId != null
+                    ? await ApiServices.updateRestoReview(reviewId, data)
+                    : await ApiServices.storeRestoReview(data);
 
-                if (context.mounted) {
+                if (mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(result['message']),
-                      backgroundColor: result['success'] ? Colors.green : Colors.red,
-                    ),
-                  );
+                  _triggerParentRefresh();
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(result['message'] ?? "Selesai"),
+                      backgroundColor: result['success'] == true ? Colors.green : Colors.red));
                 }
               },
               child: isSending 
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
-                : const Text("Kirim"),
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text(isEdit ? "Simpan" : "Kirim"),
             ),
           ],
         ),
       ),
     );
   }
+  // --- 3. FUNGSI HAPUS ---
+  void _confirmDeleteReview(int reviewId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Hapus Ulasan?"),
+        content: const Text("Tindakan ini tidak bisa dibatalkan."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context);
+              final SharedPreferences prefs = await SharedPreferences.getInstance();
+              int userId = prefs.getInt('user_id') ?? 0;
+              final result = await ApiServices.deleteRestoReview(reviewId, userId);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'] ?? "Dihapus")));
+                _triggerParentRefresh();
+              }
+            },
+            child: const Text("Hapus", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- 4. WIDGET TOMBOL DINAMIS (SOLUSI ERROR TERBESAR KAMU) ---
+  Widget _buildTrailingWidget(Map<String, dynamic> item, bool isPaid, Color primaryColor) {
+    bool isReviewed = (item['is_reviewed'] as bool?) ?? false;
+
+    // 1. Jika Belum Lunas (Masih Pending)
+    if (!isPaid) {
+      double subPrice = double.tryParse(item['harga_at_porsi'].toString()) ?? 0;
+      int qty = int.tryParse(item['jumlah'].toString()) ?? 0;
+      return Text("Rp ${(subPrice * qty).toStringAsFixed(0)}",
+          style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor));
+    }
+
+    // 2. Jika SUDAH Lunas TAPI SUDAH Diulas (Tombol Mati/Abu-abu)
+    if (isReviewed) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text("SUDAH DIULAS ", style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+          IconButton(
+            icon: const Icon(Icons.edit_note, color: Colors.blue), // Edit tetap boleh
+            onPressed: () => _showRestoReviewDialog(
+              context, item['menu_id'], item['menu']['nama_menu'],
+              isEdit: true,
+              reviewId: item['review_id'],
+              existingData: item['existing_review'],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red), // Hapus tetap boleh
+            onPressed: () => _confirmDeleteReview(item['review_id']),
+          ),
+        ],
+      );
+    } 
+    
+    // 3. Jika SUDAH Lunas DAN BELUM Diulas (Tombol Hijau Aktif)
+    else {
+      return ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          minimumSize: const Size(60, 30),
+        ),
+        onPressed: () => _showRestoReviewDialog(context, item['menu_id'], item['menu']['nama_menu']),
+        child: const Text("ULAS", style: TextStyle(fontSize: 10, color: Colors.white)),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).primaryColor;
-    final List<dynamic> details = order['details'] ?? [];
+    final List<dynamic> details = _currentOrder['details'] ?? [];
 
-    // Logika Status Pembayaran
-    bool isPaid = order['status_pembayaran_id'].toString() == '2';
+    bool isPaid = _currentOrder['status_pembayaran_id'].toString() == '2';
     Color statusColor = isPaid ? Colors.green : Colors.orange;
     String statusText = isPaid ? "SUDAH DIBAYAR" : "MENUNGGU PEMBAYARAN";
 
-    // --- LOGIKA LOKASI PENGANTARAN ---
-    String deliveryType = order['tipe_pengantaran'] ?? "Meja";
-    String locationNum = order['nomor_lokasi'] ?? "-";
+    String deliveryType = _currentOrder['tipe_pengantaran'] ?? "Meja";
+    String locationNum = _currentOrder['nomor_lokasi'] ?? "-";
     IconData locationIcon = deliveryType == "Kamar" ? Icons.bed : Icons.table_restaurant;
 
     return Scaffold(
@@ -126,54 +232,34 @@ class OrderDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- HEADER STATUS & LOKASI ---
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: primaryColor.withOpacity(0.3)),
-                    ),
+                        color: primaryColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: primaryColor.withOpacity(0.3))),
                     child: Column(
                       children: [
                         Icon(Icons.restaurant, size: 40, color: primaryColor),
                         const SizedBox(height: 10),
-                        Text(
-                          "Nota #RS-${order['id']}",
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          statusText,
-                          style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
-                        ),
+                        Text("Nota #RS-${_currentOrder['id']}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
                         const Divider(height: 30),
-                        // --- INFO LOKASI ANTAR ---
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(locationIcon, size: 20, color: primaryColor),
                             const SizedBox(width: 8),
-                            Text(
-                              "Lokasi Antar: $deliveryType $locationNum",
-                              style: TextStyle(
-                                fontSize: 15, 
-                                fontWeight: FontWeight.w600, 
-                                color: primaryColor
-                              ),
-                            ),
+                            Text("Lokasi Antar: $deliveryType $locationNum", style: const TextStyle(fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 25),
-
                   const Text("Pesanan Anda:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
-
-                  // --- DAFTAR MENU ---
                   Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -184,55 +270,25 @@ class OrderDetailScreen extends StatelessWidget {
                       separatorBuilder: (context, index) => const Divider(indent: 15, endIndent: 15),
                       itemBuilder: (context, index) {
                         final item = details[index];
-                        String menuName = item['menu']['nama_menu'] ?? "Menu";
-                        int menuId = item['menu_id'];
-
                         return ListTile(
-                          title: Text(menuName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          title: Text(item['menu']['nama_menu'] ?? "Menu", style: const TextStyle(fontWeight: FontWeight.w600)),
                           subtitle: Text("${item['jumlah']} porsi x Rp ${double.parse(item['harga_at_porsi'].toString()).toStringAsFixed(0)}"),
-                          trailing: isPaid 
-                            ? ElevatedButton(
-                                onPressed: () => _showRestoReviewDialog(context, menuId, menuName),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryColor,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                                  minimumSize: const Size(60, 30),
-                                ),
-                                child: const Text("ULAS", style: TextStyle(fontSize: 10, color: Colors.white)),
-                              )
-                            : Text(
-                                "Rp ${(item['jumlah'] * double.parse(item['harga_at_porsi'].toString())).toStringAsFixed(0)}",
-                                style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor),
-                              ),
+                          // --- MENGGUNAKAN WIDGET HELPER ---
+                          trailing: _buildTrailingWidget(item, isPaid, primaryColor),
                         );
                       },
                     ),
                   ),
-
                   const SizedBox(height: 25),
-
-                  const Text("Informasi Pembayaran:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
                   Container(
                     padding: const EdgeInsets.all(15),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
+                    decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey[200]!)),
                     child: Column(
                       children: [
-                        _buildInfoRow("Metode Pembayaran", order['metode_pembayaran'] ?? "-"),
-                        _buildInfoRow("Waktu Pesan", order['created_at'].toString().substring(0, 16).replaceAll('T', ' ')),
-                        _buildInfoRow("Tipe Pengantaran", deliveryType),
-                        _buildInfoRow("No. Meja/Kamar", locationNum),
+                        _buildInfoRow("Metode Pembayaran", _currentOrder['metode_pembayaran'] ?? "-"),
+                        _buildInfoRow("Waktu Pesan", _currentOrder['created_at'].toString().substring(0, 16).replaceAll('T', ' ')),
                         const Divider(),
-                        _buildInfoRow(
-                          "Total Bayar", 
-                          "Rp ${double.parse(order['total_harga'].toString()).toStringAsFixed(0)}",
-                          isBold: true,
-                          color: primaryColor,
-                        ),
+                        _buildInfoRow("Total Bayar", "Rp ${double.parse(_currentOrder['total_harga'].toString()).toStringAsFixed(0)}", isBold: true, color: primaryColor),
                       ],
                     ),
                   ),
@@ -252,14 +308,7 @@ class OrderDetailScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          Text(
-            value, 
-            style: TextStyle(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-              fontSize: isBold ? 18 : 13,
-              color: color,
-            )
-          ),
+          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.w600, fontSize: isBold ? 18 : 13, color: color)),
         ],
       ),
     );
