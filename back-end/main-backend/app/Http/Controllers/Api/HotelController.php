@@ -190,67 +190,49 @@ class HotelController extends Controller
 
     /**
      * 3. AMBIL RIWAYAT RESERVASI
-     */
-    /**
-     * 3. AMBIL RIWAYAT RESERVASI (Versi Fix)
-     */
-    /**
-     * 3. AMBIL RIWAYAT RESERVASI (Versi Fix Nama & NIK)
+     * Logika: Cek ulasan berdasarkan ID Reservasi unik
      */
     public function getReservationHistory(Request $request)
     {
         $userId = $request->query('user_id');
-
-        if (!$userId) {
-            return response()->json(['success' => false, 'message' => 'User ID missing'], 400);
-        }
+        if (!$userId) return response()->json(['success' => false], 400);
 
         try {
-            // Ambil riwayat dengan relasi detail (identitas), tipeKamar (withTrashed), dan status
-            $history = Reservasi::with(['details', 'tipeKamar' => function($q){
-                    $q->withTrashed();
-                }, 'statusReservasi'])
+            $history = \App\Models\hotel\Reservasi::with(['details', 'tipeKamar'])
                 ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc')
                 ->get();
 
             $data = $history->map(function ($res) {
-                // Ambil rincian tamu dari relasi details (yang baru kita buat di model)
-                $detailTamu = $res->details->first();
+                // CARI ULASAN BERDASARKAN ID RESERVASI
+                $review = \App\Models\hotel\UlasanHotel::where('reservasi_id', $res->id)->first();
 
                 return [
                     'id'                  => $res->id,
-                    'tipe_kamar_id'       => $res->tipe_kamar_id,
-                    'tgl_checkin'         => $res->tgl_checkin,
-                    'tgl_checkout'        => $res->tgl_checkout,
-                    'total_malam'         => $res->total_malam,
-                    'total_harga'         => $res->total_harga,
-                    'metode_pembayaran'   => $res->metode_pembayaran,
+                    'tipe_kamar_id'       => $res->tipe_kamar_id, 
                     'status_reservasi_id' => $res->status_reservasi_id,
-                    'snap_token'          => $res->snap_token,
+                    'tgl_checkin'         => $res->tgl_checkin,
+                    'total_harga'         => $res->total_harga,
+                    'total_malam'         => $res->total_malam,
                     'nama_tipe'           => $res->tipeKamar->nama_tipe ?? 'Kamar',
-
-                    // --- DATA IDENTITAS (Dipindah ke level depan agar Flutter mudah baca) ---
-                    'nama_tamu'           => $detailTamu->nama_tamu ?? '-',
-                    'nik_identitas'       => $detailTamu->nik_identitas ?? '-',
-                    'jumlah_tamu'         => $detailTamu->jumlah_tamu ?? 0,
-
-                    // Kita tetap kirim details asli sebagai cadangan
                     'details'             => $res->details,
+                    'is_reviewed'         => $review ? true : false,
+                    'review_id'           => $review ? $review->id : null,
+                    // PASTIKAN KEY INI ADA DAN NAMANYA 'existing_review'
+                    'existing_review'     => $review ? [
+                        'rating'       => $review->rating,
+                        'komentar'     => $review->komentar,
+                        'is_anonymous' => (bool)$review->is_anonymous
+                    ] : null,
                 ];
             });
 
-            return response()->json(['success' => true, 'data' => $data], 200);
-
+            return response()->json(['success' => true, 'data' => $data]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
-    /**
-     * 4. WEBHOOK CALLBACK (OTOMATIS KIRIM NOTIFIKASI)
-     */
-    /**
+        /**
      * 4. WEBHOOK CALLBACK (OTOMATIS KIRIM NOTIFIKASI HOTEL & RESTO)
      */
     public function handleCallback(Request $request)
@@ -439,29 +421,48 @@ else if ($prefix == 'RESTO') {
         }
     }
 
-    /**
+/**
      * 7. STAFF HOTEL: KONFIRMASI CHECK-OUT
+     * Alur: Bebaskan Kamar -> Update Status Reservasi ke SELESAI (4) -> Kirim Notif
      */
     public function confirmCheckOut($id)
     {
         try {
-            // Cari reservasi beserta data kamar fisiknya
-            $reservasi = Reservasi::with('kamar')->find($id);
-            if (!$reservasi) return response()->json(['success' => false, 'message' => 'Data tidak ditemukan'], 404);
+            // Cari reservasi beserta data kamar fisiknya menggunakan relasi 'kamar'
+            $reservasi = \App\Models\hotel\Reservasi::with('kamar')->find($id);
+            
+            if (!$reservasi) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Data reservasi tidak ditemukan'
+                ], 404);
+            }
+
+            // Pastikan hanya tamu yang sedang Check-in (ID 3) yang bisa Check-out
+            if ($reservasi->status_reservasi_id != 3) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Hanya tamu dengan status Check-in yang dapat melakukan Check-out.'
+                ], 400);
+            }
 
             DB::beginTransaction();
 
-            // 1. Ubah status Kamar Fisik kembali ke 1 (Tersedia)
+            // 1. Ubah status Kamar Fisik kembali ke 1 (Tersedia/Available)
             if ($reservasi->kamar) {
                 $reservasi->kamar->update(['status_kamar_id' => 1]);
             }
 
             // 2. Update status reservasi menjadi SELESAI (ID 4)
-            $reservasi->update(['status_reservasi_id' => 4]);
+            // KUNCI: Sekarang kita gunakan ID 4 sesuai urutan database yang baru
+            $reservasi->update([
+                'status_reservasi_id' => 4,
+                'updated_at' => now()
+            ]);
 
             DB::commit();
 
-            // 3. PICU NOTIFIKASI CHECK-OUT
+            // 3. PICU NOTIFIKASI CHECK-OUT KE HP USER (Port 8002)
             try {
                 $this->notifService->sendCheckoutSuccess(
                     $reservasi->fcm_token ?? 'no_token',
@@ -469,20 +470,24 @@ else if ($prefix == 'RESTO') {
                     $reservasi->id
                 );
             } catch (\Exception $e) {
+                // Gunakan \Log agar tidak error "Undefined type Log"
                 Log::error("Gagal kirim notif checkout: " . $e->getMessage());
             }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Check-out berhasil. Kamar kini tersedia kembali.'
+                'message' => 'Check-out berhasil. Kamar nomor ' . ($reservasi->kamar->nomor_kamar ?? '-') . ' kini tersedia kembali.',
+                'status' => 'SELESAI'
             ]);
 
         } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false, 
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
         }
     }
-
 
 
 

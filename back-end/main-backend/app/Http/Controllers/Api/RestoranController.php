@@ -30,41 +30,76 @@ class RestoranController extends Controller
     /**
      * 1. MENGAMBIL DAFTAR MENU (DENGAN FILTER EVENT)
      */
-    public function getMenus()
+public function getMenus()
     {
         try {
-            // 1. Cari tahu event apa yang sedang aktif saat ini
+            // 1. Cari Event Aktif
             $activeEvent = Event::where('is_active', true)->first();
 
-            // 2. LOGIKA FILTER (Poin permintaanmu):
+            // 2. Cari Promo Global Restoran (is_active = true)
+            $promoGlobal = \App\Models\hotel\Promo::where('kategori', 'restoran')
+                ->where('is_active', true)
+                ->whereNull('kode_promo')
+                ->whereDate('tgl_mulai', '<=', now())
+                ->whereDate('tgl_selesai', '>=', now())
+                ->first();
 
-            // JIKA TEMA 'DEFAULT' (Bukan Hari Besar)
+            // 3. Ambil Menu berdasarkan Event
             if (!$activeEvent || $activeEvent->event_code == 'default') {
-                // Ambil SEMUA menu tanpa terkecuali
-                $menus = Menu::with(['kategori', 'status'])->get();
+                $rawMenus = Menu::with(['kategori', 'status'])->get();
+            } else {
+                // TETAP MENGGUNAKAN RELASI DENGAN withPivot
+                $rawMenus = $activeEvent->menus()->with(['kategori', 'status'])->get();
+                
+                // Fallback jika menu event kosong
+                if ($rawMenus->isEmpty()) {
+                    $rawMenus = Menu::with(['kategori', 'status'])->get();
+                }
             }
 
-            // JIKA TEMA HARI BESAR AKTIF (HUT RI, Valentine, dll)
-            else {
-                // HANYA ambil menu yang didaftarkan (punya relasi) ke event tersebut
-                $menus = $activeEvent->menus()->with(['kategori', 'status'])->get();
-            }
+            // 4. LOGIKA HITUNG HARGA (PARETO PROMO)
+            $data = $rawMenus->map(function ($item) use ($promoGlobal) {
+                $hargaAsli = (float) $item->harga;
+                $hargaAkhir = $hargaAsli;
+                $infoPromo = null;
+
+                // Cek apakah ada diskon global (misal 3%)
+                if ($promoGlobal) {
+                    $potongan = ($promoGlobal->tipe_diskon == 'persen') 
+                        ? $hargaAsli * ($promoGlobal->nominal_potongan / 100) 
+                        : (float) $promoGlobal->nominal_potongan;
+                    
+                    $infoPromo = ($promoGlobal->tipe_diskon == 'persen') 
+                        ? "Diskon " . (int)$promoGlobal->nominal_potongan . "%" 
+                        : "Potongan Rp " . number_format($potongan, 0, ',', '.');
+                    
+                    $hargaAkhir = $hargaAsli - $potongan;
+                }
+
+                return [
+                    'id' => $item->id,
+                    'nama_menu' => $item->nama_menu,
+                    'deskripsi' => $item->deskripsi,
+                    'harga_asli' => $hargaAsli,
+                    'harga_akhir' => $hargaAkhir,
+                    'stok' => $item->stok,
+                    'foto_menu' => $item->foto_menu,
+                    'kategori' => $item->kategori,
+                    'status' => $item->status,
+                    'promo_aktif' => $infoPromo, // Teks ini untuk label di Flutter
+                ];
+            });
 
             return response()->json([
                 'success' => true,
-                'message' => 'Daftar menu berhasil dimuat.',
                 'active_theme' => $activeEvent->event_code ?? 'default',
-                'data'    => $menus
+                'data' => $data
             ], 200);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil menu: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
 /**
      * 2. PROSES PEMESANAN & GENERATE PEMBAYARAN MIDTRANS
      * (Versi Lengkap: Dengan Lokasi Pengantaran Meja/Kamar)
@@ -243,43 +278,48 @@ class RestoranController extends Controller
     }
 
 /**
-     * 6. AMBIL RIWAYAT PESANAN (Terintegrasi Lokasi Pengantaran)
+     * 6. AMBIL RIWAYAT PESANAN RESTORAN
+     * Logika: Cek ulasan berdasarkan ID Pesanan & ID Menu
      */
     public function getOrderHistory(Request $request)
     {
-        // 1. Ambil User ID dari parameter query
         $userId = $request->query('user_id');
-
-        if (!$userId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User ID tidak ditemukan.'
-            ], 400);
-        }
+        if (!$userId) return response()->json(['success' => false, 'message' => 'User ID tidak ditemukan.'], 400);
 
         try {
-            // PERBAIKAN: Tambahkan closure pada with untuk memanggil withTrashed()
-            $history = PesananMenu::with(['details.menu' => function ($query) {
-                    $query->withTrashed();
-                }])
+            $history = PesananMenu::with(['details.menu'])
                 ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc')
                 ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Riwayat pesanan berhasil dimuat.',
-                'data'    => $history
-            ], 200);
+            $data = $history->map(function ($order) {
+                // Map detail menu di dalam pesanan tersebut
+                $order->details = $order->details->map(function ($detail) use ($order) {
+                    
+                    // --- PERBAIKAN: Kunci pengecekan pada pesanan_menu_id DAN menu_id ---
+                    $review = \App\Models\restoran\UlasanRestoran::where('pesanan_menu_id', $order->id)
+                        ->where('menu_id', $detail->menu_id)
+                        ->first();
+                    
+                    $detail->is_reviewed = $review ? true : false;
+                    $detail->review_id = $review ? $review->id : null;
+                    $detail->existing_review = $review ? [
+                        'rating' => $review->rating,
+                        'komentar' => $review->komentar,
+                        'is_anonymous' => (bool)$review->is_anonymous
+                    ] : null;
+                    
+                    return $detail;
+                });
+                return $order;
+            });
 
+            return response()->json(['success' => true, 'data' => $data]);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal memuat riwayat: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
+    
     /**
      * FUNGSI UPDATE STATUS PESANAN (Hanya 4 Status)
      */

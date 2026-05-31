@@ -10,16 +10,24 @@ use App\Models\restoran\StatusPesanan;
 use App\Models\restoran\StatusPembayaran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use App\Services\NotificationClientService;
 
 class PesananController extends Controller
 {
+    protected $notifService;
+
+    public function __construct(NotificationClientService $notifService)
+    {
+        $this->notifService = $notifService;
+    }
+
     // 1. DAFTAR PESANAN
     public function index()
     {
         $token = session('user.token');
         $response = Http::withToken($token)->get(env('MIKRO_URL') . '/api/users');
-
-        // PENTING: Harus pakai keyBy('id') agar bisa dipanggil $users[$id] di Blade
         $users = collect($response->json('data') ?? [])->keyBy('id');
 
         $pesanan = PesananMenu::with(['details.menu', 'statusPesanan', 'statusPembayaran'])
@@ -28,14 +36,13 @@ class PesananController extends Controller
         return view('dashboard.restoran.pesanan.index', compact('pesanan', 'users'));
     }
 
-    // --- 2. TAMPIL DETAIL (Penting agar struk tidak error) ---
+    // 2. TAMPIL DETAIL
     public function show($id)
     {
         $token = session('user.token');
         $response = Http::withToken($token)->get(env('MIKRO_URL') . '/api/users');
         $users = collect($response->json('data') ?? [])->keyBy('id');
 
-        // Tambahkan withTrashed() agar menu yang sudah dihapus tetap muncul namanya
         $pesanan = PesananMenu::with(['details.menu' => function($q) {
             $q->withTrashed();
         }, 'statusPesanan', 'statusPembayaran'])->findOrFail($id);
@@ -54,49 +61,55 @@ class PesananController extends Controller
         return view('dashboard.restoran.pesanan.create', compact('customers', 'menus'));
     }
 
-    // 4. SIMPAN DATA
-    // --- 4. SIMPAN DATA (STORE) ---
+    // 4. SIMPAN DATA (STORE)
     public function store(Request $request)
     {
         $request->validate([
             'user_id' => 'required',
-            'nomor_meja' => 'required|string', // Pastikan ini 'nomor_meja'
+            'nomor_meja' => 'required|string',
             'menu_ids' => 'required|array',
             'jumlah' => 'required|array',
         ]);
 
-        $pesanan = PesananMenu::create([
-            'user_id'           => $request->user_id,
-            'nomor_meja'        => $request->nomor_meja, // FIX: Kembalikan ke nomor_meja
-            'total_harga'       => 0,
-            'metode_pembayaran' => $request->metode_pembayaran ?? 'Tunai',
-            'status_pembayaran_id' => 1,
-            'status_pesanan_id'    => 1,
-        ]);
-
-        // ... (logika looping detail_pesanan tetap sama) ...
-        $total = 0;
-        foreach ($request->menu_ids as $key => $mId) {
-            $menu = Menu::find($mId);
-            $qty = $request->jumlah[$key];
-            \App\Models\restoran\DetailPesanan::create([
-                'pesanan_menu_id' => $pesanan->id,
-                'menu_id' => $mId,
-                'jumlah' => $qty,
-                'harga_at_porsi' => $menu->harga,
-                'status_pesanan_id' => 1
+        DB::beginTransaction();
+        try {
+            // FIX: Gunakan 'nomor_lokasi' (kolom DB) untuk menyimpan input 'nomor_meja'
+            $pesanan = PesananMenu::create([
+                'user_id'           => $request->user_id,
+                'nomor_lokasi'      => $request->nomor_meja, // <--- PERBAIKAN SINKRONISASI
+                'total_harga'       => 0,
+                'metode_pembayaran' => $request->metode_pembayaran ?? 'Tunai',
+                'status_pembayaran_id' => 1,
+                'status_pesanan_id'    => 1,
+                'tipe_pengantaran'  => 'Meja', // Default jika buat dari dashboard resto
             ]);
-            $total += ($menu->harga * $qty);
-        }
-        $pesanan->update(['total_harga' => $total]);
 
-        return redirect()->route('dashboard.restoran.pesanan.index')->with('success', 'Pesanan Meja ' . $request->nomor_meja . ' berhasil dibuat!');
+            $total = 0;
+            foreach ($request->menu_ids as $key => $mId) {
+                $menu = Menu::find($mId);
+                $qty = $request->jumlah[$key];
+                DetailPesanan::create([
+                    'pesanan_menu_id' => $pesanan->id,
+                    'menu_id' => $mId,
+                    'jumlah' => $qty,
+                    'harga_at_porsi' => $menu->harga,
+                    'status_pesanan_id' => 1
+                ]);
+                $total += ($menu->harga * $qty);
+            }
+            $pesanan->update(['total_harga' => $total]);
+
+            DB::commit();
+            return redirect()->route('dashboard.restoran.pesanan.index')->with('success', 'Pesanan Meja ' . $request->nomor_meja . ' berhasil dibuat!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal: ' . $e->getMessage());
+        }
     }
 
     // 5. FORM EDIT
-        public function edit($id)
+    public function edit($id)
     {
-        // Tambahkan withTrashed() agar menu yang sudah dihapus tetap muncul namanya
         $pesanan = PesananMenu::with(['details.menu' => function($q) {
             $q->withTrashed();
         }])->findOrFail($id);
@@ -107,43 +120,38 @@ class PesananController extends Controller
         return view('dashboard.restoran.pesanan.edit', compact('pesanan', 'statusList', 'paymentStatusList'));
     }
 
-    // 6. UPDATE
-        // --- 6. UPDATE DATA ---
+    // 6. UPDATE DATA (DENGAN FIX KOLOM nomor_lokasi)
     public function update(Request $request, $id)
     {
         $pesanan = PesananMenu::findOrFail($id);
+        
+        // Simpan status lama untuk pemicu notifikasi
+        $statusPesananLama = $pesanan->status_pesanan_id;
+        $statusBayarLama   = $pesanan->status_pembayaran_id;
 
-        $request->validate([
-            'nomor_meja' => 'required|string', // FIX: Pastikan ini nomor_meja
-            'status_pesanan_id' => 'required|exists:status_pesanan,id',
-            'status_pembayaran_id' => 'required|exists:status_pembayaran,id',
-        ]);
-
-        // FIX: Gunakan $request->nomor_meja
         $pesanan->update([
-            'nomor_meja' => $request->nomor_meja,
-            'status_pesanan_id' => $request->status_pesanan_id,
+            'nomor_lokasi'         => $request->nomor_meja,
+            'status_pesanan_id'    => $request->status_pesanan_id, // <--- SEKARANG INI SUDAH ADA DI DB
             'status_pembayaran_id' => $request->status_pembayaran_id,
         ]);
 
-        return redirect()->route('dashboard.restoran.pesanan.index')->with('success', 'Data pesanan Meja ' . $request->nomor_meja . ' berhasil diperbarui!');
+        // ... (Logika notifikasi ke HP tetap di bawah sini) ...
+        if ($statusPesananLama != 3 && $request->status_pesanan_id == 3) {
+             $this->notifService->orderReady($pesanan->fcm_token, $pesanan->user_id, $pesanan->id);
+        }
+        
+        return redirect()->route('dashboard.restoran.pesanan.index')->with('success', 'Data diperbarui!');
     }
 
     // 7. HAPUS / BATALKAN
     public function destroy($id)
     {
         $pesanan = PesananMenu::findOrFail($id);
+        $pesan = ($pesanan->status_pembayaran_id == 2) 
+            ? 'Pesanan lunas telah diarsipkan.' 
+            : 'Pesanan berhasil dibatalkan.';
 
-        // Tentukan kalimat pesan berdasarkan status sebelum dihapus
-        if ($pesanan->status_pembayaran_id == 2) {
-            $pesan = 'Pesanan yang telah lunas berhasil diarsipkan (Soft Delete).';
-        } else {
-            $pesan = 'Pesanan berhasil dibatalkan dan dipindahkan ke arsip.';
-        }
-
-        // Jalankan Soft Delete (Data tetap aman di database)
         $pesanan->delete();
-
         return redirect()->back()->with('success', $pesan);
     }
 }

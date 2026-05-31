@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             HotelSeeder::class,
             RestoranSeeder::class,
             EventSeeder::class,
+            StatusPembayaranSeeder::class,
         ]);
     }
 }

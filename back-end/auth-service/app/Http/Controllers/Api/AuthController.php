@@ -293,14 +293,12 @@ public function login(Request $request)
 
 
     /**
-     * 10. INTERNAL API: Ambil Semua Token User untuk Broadcast
-     * Fungsi ini akan dipanggil oleh AdminController di Port 8001
+     * 10. INTERNAL API: Ambil Data User untuk Sinkronisasi Nama Ulasan
      */
     public function getAllUserTokens()
     {
-        // Ambil hanya user yang memiliki fcm_token
-        $users = User::whereNotNull('fcm_token')
-            ->select('id as user_id', 'fcm_token as token')
+        // Ambil ID, Username, dan Nama Lengkap
+        $users = User::select('id as user_id', 'username', 'full_name', 'fcm_token as token')
             ->get();
 
         return response()->json([

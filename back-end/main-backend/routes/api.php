@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\EventController;
 use App\Http\Controllers\Api\PromoController;
 use App\Services\NotificationClientService;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Dashboard\Hotel\PembayaranHotelController;
 
 
 /*
@@ -78,4 +79,12 @@ Route::post('/resto/confirm-payment/{id}', [RestoranController::class, 'confirmP
 
 Route::post('/hotel/confirm-checkin/{id}', [HotelController::class, 'confirmCheckIn']);
 Route::post('/hotel/confirm-checkout/{id}', [HotelController::class, 'confirmCheckOut']);
+
+Route::put('/review/restoran/{id}', [UlasanController::class, 'updateRestoReview']);
+Route::delete('/review/restoran/{id}', [UlasanController::class, 'destroyRestoReview']);
+
+Route::put('/review/hotel/{id}', [UlasanController::class, 'updateHotelReview']);
+Route::delete('/review/hotel/{id}', [UlasanController::class, 'destroyHotelReview']);
+
+Route::post('/pembayaran/confirm/{id}', [PembayaranHotelController::class, 'confirmPayment'])->name('dashboard.hotel.pembayaran.confirm');
 

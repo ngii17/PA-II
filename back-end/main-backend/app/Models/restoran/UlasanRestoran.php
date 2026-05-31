@@ -8,14 +8,15 @@ class UlasanRestoran extends Model
 {
     protected $table = 'ulasan_restoran';
 
-    protected $fillable = [
-        'user_id',
-        'menu_id',
-        'rating',
-        'komentar',
-        'is_hidden',
-        'is_anonymous'
-    ];
+protected $fillable = [
+    'user_id',
+    'menu_id',
+    'pesanan_menu_id', // <--- WAJIB ADA
+    'rating',
+    'komentar',
+    'is_anonymous',
+    'is_hidden',
+];
 
     /**
      * RELASI: Ulasan ini merujuk pada Menu apa?

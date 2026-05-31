@@ -12,18 +12,21 @@ class Reservasi extends Model
     protected $table = 'reservasi';
 
     protected $fillable = [
-        'user_id',
-        'tipe_kamar_id',
-        'kamar_id',
-        'tgl_checkin',
-        'tgl_checkout',
-        'total_malam',
-        'total_harga',
-        'metode_pembayaran',
-        'status_reservasi_id',
-        'snap_token',
-    ];
-
+    'user_id',
+    'fcm_token', // <--- WAJIB ADA agar Pop-up muncul
+    'tipe_kamar_id',
+    'kamar_id',
+    'tgl_checkin',
+    'tgl_checkout',
+    'total_malam',
+    'total_harga',
+    'metode_pembayaran',
+    'status_reservasi_id',
+    'snap_token',
+    'deposit_amount', // <--- TAMBAHKAN INI
+    'confirmed_by',   // <--- TAMBAHKAN INI
+    'confirmed_at',   // <--- TAMBAHKAN INI
+];
     /**
      * TAMBAHKAN RELASI INI (WAJIB)
      * Agar data Nama Tamu & NIK dari tabel detail_reservasi bisa terbaca

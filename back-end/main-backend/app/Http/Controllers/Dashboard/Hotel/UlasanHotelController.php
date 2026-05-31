@@ -6,24 +6,34 @@ use App\Http\Controllers\Controller;
 use App\Models\hotel\UlasanHotel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class UlasanHotelController extends Controller
 {
     /**
-     * Menampilkan daftar ulasan hotel.
-     * Dapat diakses oleh Admin dan Staff Hotel.
+     * 1. MENAMPILKAN DAFTAR ULASAN HOTEL
+     * Sinkronisasi: Mengambil nama asli pengulas dari Port 8000
      */
     public function index()
     {
-        // 1. Ambil data user dari microservice untuk mendapatkan nama pelanggan asli
-        $token = session('user.token');
-        $response = Http::withToken($token)->get(env('MIKRO_URL') . '/api/users');
-        $users = collect($response->json('data') ?? [])->keyBy('id');
+        // A. Ambil data user dari Auth-Service (Port 8000) dengan aman
+        $users = collect();
+        try {
+            $token = session('user.token');
+            $response = Http::timeout(5)->withToken($token)->get(env('MIKRO_URL') . '/api/users');
+            
+            if ($response->successful()) {
+                $users = collect($response->json('data') ?? [])->keyBy('id');
+            }
+        } catch (\Exception $e) {
+            Log::error("Dashboard Ulasan Hotel: Gagal mengambil data user dari Port 8000. Pesan: " . $e->getMessage());
+            // Tetap lanjut meskipun Port 8000 down, nama user akan ditangani fallback
+        }
 
-        // 2. Ambil ulasan KHUSUS Hotel saja dengan relasi tipe kamar
+        // B. Ambil ulasan Hotel dengan relasi tipe kamar
         $ulasan = UlasanHotel::with('tipeKamar')->orderBy('created_at', 'desc')->get();
 
-        // 3. Hitung statistik ringkas untuk ditampilkan di card dashboard ulasan
+        // C. Hitung statistik untuk Dashboard
         $totalUlasan = $ulasan->count();
         $rataRating = $ulasan->avg('rating') ?? 0;
 
@@ -31,27 +41,30 @@ class UlasanHotelController extends Controller
     }
 
     /**
-     * Fitur Sembunyikan/Tampilkan Ulasan (Toggle).
-     * PENGAMANAN: Khusus Admin saja.
+     * 2. FITUR SEMBUNYIKAN/TAMPILKAN ULASAN (TOGGLE)
+     * PENGAMANAN DOSEN: Hanya ROLE ADMIN yang boleh mengeksekusi ini.
      */
     public function toggle($id)
     {
-        // 1. CEK KEAMANAN ROLE
-        // Jika user yang login bukan 'admin', maka tolak akses
+        // --- VALIDASI HAK AKSES ADMIN ---
+        // Sesuai permintaan dosen, Staff Hotel dilarang memoderasi ulasan.
         if (session('user.role') !== 'admin') {
-            return redirect()->back()->with('error', 'Akses ditolak: Hanya Admin yang memiliki wewenang memoderasi ulasan.');
+            return redirect()->back()->with('error', 'Akses Ditolak! Hanya Administrator yang diperbolehkan memoderasi ulasan pelanggan.');
         }
 
-        // 2. PROSES TOGGLE STATUS VISIBILITAS
-        $ulasan = UlasanHotel::findOrFail($id);
+        try {
+            $ulasan = UlasanHotel::findOrFail($id);
 
-        // Mengubah status is_hidden menjadi kebalikannya (True ke False, atau sebaliknya)
-        $ulasan->update([
-            'is_hidden' => !$ulasan->is_hidden
-        ]);
+            // Balikkan status (jika hidden jadi tampil, jika tampil jadi hidden)
+            $ulasan->update([
+                'is_hidden' => !$ulasan->is_hidden
+            ]);
 
-        // 3. REDIRECT DENGAN PESAN DINAMIS
-        $status = $ulasan->is_hidden ? 'disembunyikan' : 'ditampilkan';
-        return redirect()->back()->with('success', "Ulasan hotel berhasil $status!");
+            $pesan = $ulasan->is_hidden ? 'Ulasan disembunyikan dari publik.' : 'Ulasan ditampilkan kembali ke publik.';
+            return redirect()->back()->with('success', $pesan);
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal memproses moderasi: ' . $e->getMessage());
+        }
     }
 }

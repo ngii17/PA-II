@@ -11,17 +11,17 @@ class PesananMenu extends Model
 
     protected $table = 'pesanan_menu';
 
-    protected $fillable = [
-        'user_id',
-        'promo_id',
-        'total_harga',
-        'metode_pembayaran',
-        'nomor_meja',
-        'status_pesanan_id',
-        'status_pembayaran_id',
-        'snap_token',
-        'fcm_token',
-    ];
+protected $fillable = [
+    'user_id',
+    'fcm_token',
+    'total_harga',
+    'metode_pembayaran',
+    'snap_token',
+    'status_pembayaran_id',
+    'status_pesanan_id', // <--- TAMBAHKAN INI
+    'nomor_lokasi',
+    'tipe_pengantaran',
+];
 
     /**
      * RELASI: Rincian item makanan yang dibeli
