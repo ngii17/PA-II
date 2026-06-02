@@ -7,26 +7,36 @@ use App\Models\restoran\Menu;
 use App\Models\restoran\StatusMenu;
 use App\Models\restoran\KategoriMenu;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StokMenuController extends Controller
 {
+    /**
+     * 1. TAMPIL DAFTAR STOK
+     * Mengambil semua menu, termasuk yang stoknya 0.
+     */
     public function index()
     {
-        $menu = Menu::with(['kategori', 'status'])->orderBy('nama_menu')->get();
+        // PENTING: Gunakan withTrashed() jika kamu ingin menu yang di-softdelete tetap muncul di sini
+        $menu = Menu::with(['kategori', 'status'])->orderBy('nama_menu', 'asc')->get();
         return view('dashboard.restoran.stok.index', compact('menu'));
     }
 
-    // DETAIL MENU (Untuk melihat rincian stok & deskripsi)
+    /**
+     * 2. DETAIL MENU (Via AJAX untuk Modal)
+     */
     public function show($id)
     {
         $menu = Menu::with(['kategori', 'status'])->findOrFail($id);
-        return response()->json($menu); // Kita gunakan JSON agar bisa tampil di modal tanpa refresh
+        return response()->json($menu);
     }
 
+    /**
+     * 3. FORM EDIT (Navigasi ke Menu Utama)
+     */
     public function edit($id)
     {
         $menu = Menu::findOrFail($id);
-
         $kategori = KategoriMenu::all();
         $status = StatusMenu::all();
 
@@ -38,41 +48,47 @@ class StokMenuController extends Controller
         ]);
     }
 
-    // UPDATE STOK CEPAT (Fungsi yang sudah ada)
+    /**
+     * 4. UPDATE STOK CEPAT
+     * SINKRONISASI: ID 1 = Tersedia, ID 2 = Habis
+     */
     public function update(Request $request, $id)
     {
         $menu = Menu::findOrFail($id);
         $request->validate(['stok' => 'required|integer|min:0']);
 
-        // Jika stok diisi 0, otomatis status jadi "Habis" (ID 3), jika > 0 jadi "Tersedia" (ID 1)
-        $statusId = ($request->stok > 0) ? 1 : 3;
+        // --- PERBAIKAN: Gunakan ID 2 untuk Habis sesuai Seeder ---
+        $statusId = ($request->stok > 0) ? 1 : 2;
 
-        $menu->update([
-            'stok' => $request->stok,
-            'status_menu_id' => $statusId
-        ]);
+        try {
+            $menu->update([
+                'stok' => $request->stok,
+                'status_menu_id' => $statusId
+            ]);
 
-        return redirect()->back()->with('success', "Stok {$menu->nama_menu} berhasil diperbarui.");
+            return redirect()->back()->with('success', "Stok {$menu->nama_menu} berhasil diperbarui.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal update: ' . $e->getMessage());
+        }
     }
 
-    // HAPUS OTOMATIS RESET STOK 0 (Sesuai Permintaan Anda)
+    /**
+     * 5. RESET STOK (Fungsi Tombol Power-off)
+     */
     public function destroy($id)
     {
-        // 1. Cari data menu berdasarkan ID
-        $menu = \App\Models\restoran\Menu::findOrFail($id);
+        $menu = Menu::findOrFail($id);
 
-        // 2. Cari ID status yang mewakili "Habis" atau "Tidak Tersedia"
-        // Berdasarkan database kamu sebelumnya, status "Habis" adalah ID 3
-        $statusHabisId = 3;
+        try {
+            // Set stok ke 0 dan status ke ID 2 (Habis)
+            $menu->update([
+                'stok' => 0,
+                'status_menu_id' => 2 
+            ]);
 
-        // 3. Update stok menjadi 0 dan status menjadi Habis (Sesuai BPMN 3.2.1.43)
-        // Kita TIDAK memanggil $menu->delete(), jadi data tetap ada di tabel menu
-        $menu->update([
-            'stok' => 0,
-            'status_menu_id' => $statusHabisId
-        ]);
-
-        // 4. Kembali ke halaman stok dengan pesan sukses
-        return redirect()->back()->with('success', "Stok untuk {$menu->nama_menu} telah dikosongkan (Set ke 0) dan status menjadi Habis.");
+            return redirect()->back()->with('success', "Stok {$menu->nama_menu} telah dikosongkan.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal mengosongkan stok.');
+        }
     }
 }

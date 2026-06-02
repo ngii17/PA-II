@@ -1,26 +1,28 @@
-<div>
-    <!-- Live as if you were to die tomorrow. Learn as if you were to live forever. - Mahatma Gandhi -->
-</div>
 @extends('dashboard.layouts.app')
-@section('title', 'Ulasan Hotel')
+@section('title', 'Ulasan Restoran')
 @section('content')
-<div class="container-fluid">
-    <h4 class="mb-4 fw-bold">⭐ Ulasan Pelanggan Hotel</h4>
 
-    {{-- Widget Statistik --}}
+<div class="container-fluid px-4">
+    <div class="mb-4">
+        {{-- JUDUL KHUSUS RESTORAN --}}
+        <h4 class="fw-bold mb-1"><i class="fas fa-utensils text-orange me-2"></i> Ulasan Pelanggan Restoran</h4>
+        <p class="text-muted small">Kelola feedback dan rating menu makanan/minuman dari pelanggan.</p>
+    </div>
+
+    {{-- Widget Statistik Restoran --}}
     <div class="row g-3 mb-4">
         <div class="col-md-6">
-            <div class="card border-0 shadow-sm" style="border-left:4px solid #1a1a2e;">
+            <div class="card border-0 shadow-sm" style="border-radius:15px; border-left:4px solid #fd7e14;">
                 <div class="card-body py-3">
-                    <p class="text-muted small mb-1">TOTAL ULASAN</p>
-                    <h4 class="fw-bold text-primary mb-0">{{ $totalUlasan }} Masukan</h4>
+                    <p class="text-muted small mb-1 fw-bold text-uppercase">TOTAL ULASAN MENU</p>
+                    <h4 class="fw-bold text-dark mb-0">{{ $totalUlasan }} Masukan</h4>
                 </div>
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card border-0 shadow-sm" style="border-left:4px solid #f59e0b;">
+            <div class="card border-0 shadow-sm" style="border-radius:15px; border-left:4px solid #ffc107;">
                 <div class="card-body py-3">
-                    <p class="text-muted small mb-1">RATA-RATA RATING</p>
+                    <p class="text-muted small mb-1 fw-bold text-uppercase">RATING RESTORAN</p>
                     <h4 class="fw-bold text-warning mb-0">{{ number_format($rataRating, 1) }} / 5.0 ⭐</h4>
                 </div>
             </div>
@@ -28,18 +30,21 @@
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm mb-4">{{ session('success') }}</div>
+        <div class="alert alert-success border-0 shadow-sm mb-4" style="border-radius:12px;">
+            <i class="fas fa-check-circle me-2"></i> {{ session('success') }}
+        </div>
     @endif
 
     <div class="card border-0 shadow-sm" style="border-radius:16px; overflow:hidden;">
         <div class="card-body p-0">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-dark">
-                    <tr style="background:#1a1a2e;">
+                    <tr style="background:#2c3e50;">
                         <th class="px-4 py-3">NO</th>
                         <th>PELANGGAN</th>
-                        <th>TIPE KAMAR</th>
-                        <th>RATING</th>
+                        {{-- KUNCI: Harus MENU, bukan Tipe Kamar --}}
+                        <th>MENU MAKANAN</th>
+                        <th class="text-center">RATING</th>
                         <th>KOMENTAR</th>
                         <th>TANGGAL</th>
                         <th class="text-center">STATUS</th>
@@ -52,37 +57,44 @@
                     @forelse($ulasan as $i => $u)
                     @php $user = $users[$u->user_id] ?? null; @endphp
                     <tr>
-                        <td class="px-4">{{ $i + 1 }}</td>
+                        <td class="px-4 text-muted small">{{ $i + 1 }}</td>
                         <td>
-                            <div class="fw-bold" style="font-size:13px;">{{ $user['full_name'] ?? 'Tamu' }}</div>
-                            <small class="text-muted" style="font-size:11px;">{{ $user['email'] ?? '-' }}</small>
+                            <div class="fw-bold" style="font-size:13px;">{{ $user['full_name'] ?? 'Pelanggan #'.$u->user_id }}</div>
+                            <small class="text-muted" style="font-size:11px;">{{ $user['username'] ?? '-' }}</small>
                         </td>
-                        <td style="font-size:13px;">{{ $u->tipeKamar->nama_tipe ?? '-' }}</td>
-                        <td>
-                            <div class="text-warning">
-                                {!! str_repeat('★', $u->rating) !!}{!! str_repeat('☆', 5-$u->rating) !!}
+                        <td style="font-size:13px;">
+                            {{-- SINKRON: Mengambil relasi Menu --}}
+                            <span class="fw-bold text-primary">{{ $u->menu->nama_menu ?? 'Menu Dihapus' }}</span>
+                        </td>
+                        <td class="text-center">
+                            <div class="text-warning small">
+                                @for($s=1; $s<=5; $s++)
+                                    <i class="{{ $s <= $u->rating ? 'fas' : 'far' }} fa-star"></i>
+                                @endfor
                             </div>
                         </td>
-                        <td style="max-width:250px;">
-                            <p class="mb-0 text-truncate small">{{ $u->komentar }}</p>
-                            {{-- Tombol Lihat Selengkapnya --}}
-                            <button class="btn btn-link btn-sm p-0 text-decoration-none"
-                                    style="font-size:11px;"
-                                    onclick="lihatKomentar('{{ addslashes($u->komentar) }}', '{{ $user['full_name'] ?? 'Pelanggan' }}', {{ $u->rating }})">
-                                Lihat selengkapnya
+                        <td style="max-width:220px;">
+                            <p class="mb-0 text-truncate small text-dark">{{ $u->komentar }}</p>
+                            <button class="btn btn-link btn-sm p-0 text-decoration-none fw-bold"
+                                    style="font-size:10px;"
+                                    onclick="lihatReviewResto('{{ addslashes($u->komentar) }}', '{{ $user['full_name'] ?? 'Pelanggan' }}', {{ $u->rating }})">
+                                Baca Detail
                             </button>
                         </td>
-                        <td style="font-size:12px;">{{ $u->created_at->format('d/m/Y') }}</td>
+                        <td style="font-size:12px;" class="text-muted">{{ $u->created_at->format('d/m/Y') }}</td>
                         <td class="text-center">
-                            <span class="badge {{ $u->is_hidden ? 'bg-danger' : 'bg-success' }}" style="font-size:10px; border-radius:8px;">
-                                {{ $u->is_hidden ? 'Hidden' : 'Visible' }}
-                            </span>
+                            @if($u->is_hidden)
+                                <span class="badge bg-danger" style="font-size:9px;">HIDDEN</span>
+                            @else
+                                <span class="badge bg-success" style="font-size:9px;">VISIBLE</span>
+                            @endif
                         </td>
                         @if(session('user.role') === 'admin')
                         <td class="text-center">
-                            <form action="{{ route('dashboard.hotel.ulasan.toggle', $u->id) }}" method="POST">
+                            <form action="{{ route('dashboard.restoran.ulasan.toggle', $u->id) }}" method="POST">
                                 @csrf @method('PATCH')
-                                <button type="submit" class="btn btn-sm {{ $u->is_hidden ? 'btn-outline-success' : 'btn-outline-danger' }}" style="font-size:11px; padding: 4px 10px;">
+                                <button type="submit" class="btn btn-sm {{ $u->is_hidden ? 'btn-success' : 'btn-outline-danger' }}" 
+                                        style="font-size:10px; border-radius: 8px; width: 80px;">
                                     {{ $u->is_hidden ? 'Tampilkan' : 'Sembunyikan' }}
                                 </button>
                             </form>
@@ -90,7 +102,7 @@
                         @endif
                     </tr>
                     @empty
-                    <tr><td colspan="8" class="text-center py-5 text-muted">Belum ada ulasan hotel.</td></tr>
+                    <tr><td colspan="8" class="text-center py-5 text-muted">Belum ada ulasan restoran yang masuk.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -98,24 +110,26 @@
     </div>
 </div>
 
-{{-- MODAL UNTUK MELIHAT ULASAN LENGKAP --}}
-<div class="modal fade" id="modalKomentar" tabindex="-1">
+{{-- MODAL DETAIL ULASAN RESTORAN --}}
+<div class="modal fade" id="modalReviewResto" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius:16px; overflow:hidden;">
-            <div class="modal-header border-0 py-3 px-4" style="background:#1a1a2e;">
-                <h6 class="modal-title text-white fw-bold">💬 Isi Ulasan Tamu</h6>
+        <div class="modal-content border-0 shadow-lg" style="border-radius:20px; overflow:hidden;">
+            <div class="modal-header border-0 py-3 px-4" style="background:#fd7e14;">
+                <h6 class="modal-title text-white fw-bold">🍔 Feedback Pelanggan Resto</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4 text-center">
-                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold mx-auto mb-3"
-                     style="width:50px;height:50px;font-size:18px;" id="k-avatar"></div>
-                <h6 class="fw-bold mb-0" id="k-nama"></h6>
-                <div class="text-warning my-2" id="k-bintang" style="font-size:1.2rem;"></div>
+                <div class="rounded-circle bg-orange text-white d-flex align-items-center justify-content-center fw-bold mx-auto mb-3"
+                     style="width:60px;height:60px;font-size:22px; background: #fd7e14; color: white;" id="r-avatar"></div>
+                <h6 class="fw-bold mb-0" id="r-nama"></h6>
+                <div class="text-warning my-2" id="r-bintang" style="font-size:1.2rem;"></div>
                 <hr class="w-25 mx-auto">
-                <p class="mt-3 text-muted" id="k-komentar" style="line-height:1.8; font-style:italic;"></p>
+                <div class="p-3 bg-light" style="border-radius:12px; border: 1px solid #eee;">
+                    <p class="mt-0 text-dark mb-0" id="r-komentar" style="line-height:1.6; font-style:italic;"></p>
+                </div>
             </div>
             <div class="modal-footer border-0 px-4 pb-4">
-                <button type="button" class="btn btn-outline-secondary w-100" style="border-radius:10px;" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-secondary w-100" style="border-radius:10px; font-weight:bold;" data-bs-dismiss="modal">TUTUP</button>
             </div>
         </div>
     </div>
@@ -124,18 +138,23 @@
 
 @push('scripts')
 <script>
-function lihatKomentar(komentar, nama, rating) {
-    document.getElementById('k-nama').innerText = nama;
-    document.getElementById('k-avatar').innerText = nama.charAt(0).toUpperCase();
-    document.getElementById('k-komentar').innerText = `"${komentar}"`;
+function lihatReviewResto(komentar, nama, rating) {
+    document.getElementById('r-nama').innerText = nama;
+    document.getElementById('r-avatar').innerText = nama.charAt(0).toUpperCase();
+    document.getElementById('r-komentar').innerText = `"${komentar}"`;
 
     let bintang = '';
     for(let i = 1; i <= 5; i++) {
         bintang += i <= rating ? '★' : '☆';
     }
-    document.getElementById('k-bintang').innerText = bintang;
+    document.getElementById('r-bintang').innerText = bintang;
 
-    new bootstrap.Modal(document.getElementById('modalKomentar')).show();
+    new bootstrap.Modal(document.getElementById('modalReviewResto')).show();
 }
 </script>
 @endpush
+
+<style>
+    .text-orange { color: #fd7e14; }
+    .bg-orange { background-color: #fd7e14; }
+</style>

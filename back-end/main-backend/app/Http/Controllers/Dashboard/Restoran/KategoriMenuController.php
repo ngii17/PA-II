@@ -5,21 +5,22 @@ namespace App\Http\Controllers\Dashboard\Restoran;
 use App\Http\Controllers\Controller;
 use App\Models\restoran\KategoriMenu;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class KategoriMenuController extends Controller
 {
     /**
-     * Tampil Daftar Kategori (READ)
+     * 1. TAMPIL DAFTAR KATEGORI
      */
     public function index()
     {
-        // Mengambil data kategori yang belum dihapus (Soft Delete)
+        // Staff Resto melihat kategori berdasarkan abjad
         $kategori = KategoriMenu::orderBy('nama_kategori', 'asc')->get();
         return view('dashboard.restoran.kategori.index', compact('kategori'));
     }
 
     /**
-     * Tampil Form Tambah (CREATE) - INI YANG TADI ERROR
+     * 2. FORM TAMBAH
      */
     public function create()
     {
@@ -27,7 +28,7 @@ class KategoriMenuController extends Controller
     }
 
     /**
-     * Simpan Kategori Baru (STORE)
+     * 3. SIMPAN KATEGORI BARU
      */
     public function store(Request $request)
     {
@@ -36,60 +37,69 @@ class KategoriMenuController extends Controller
             'deskripsi'     => 'nullable|string',
         ]);
 
-        KategoriMenu::create($request->all());
-
-        return redirect()->route('dashboard.restoran.kategori.index')
-                         ->with('success', 'Kategori berhasil ditambahkan!');
+        try {
+            KategoriMenu::create($request->all());
+            return redirect()->route('dashboard.restoran.kategori.index')
+                             ->with('success', 'Kategori baru berhasil ditambahkan!');
+        } catch (\Exception $e) {
+            Log::error("Gagal Simpan Kategori: " . $e->getMessage());
+            return back()->with('error', 'Gagal menyimpan kategori.')->withInput();
+        }
     }
 
     /**
-     * Tampil Form Edit (EDIT)
-     */
-    /**
-     * Tampil Form Edit
+     * 4. FORM EDIT
      */
     public function edit($id)
     {
         $kategori = KategoriMenu::findOrFail($id);
-
-        // PASTIKAN ADA KATA 'return' DI SINI
         return view('dashboard.restoran.kategori.edit', compact('kategori'));
     }
 
     /**
-     * Update Data
+     * 5. UPDATE DATA
      */
     public function update(Request $request, $id)
     {
         $kategori = KategoriMenu::findOrFail($id);
 
         $request->validate([
+            // Abaikan pengecekan unik untuk ID kategori yang sedang diedit
             'nama_kategori' => 'required|string|unique:kategori_menu,nama_kategori,' . $id,
             'deskripsi'     => 'nullable|string',
         ]);
 
-        $kategori->update($request->all());
-
-        // Gunakan .index sesuai standar resource
-        return redirect()->route('dashboard.restoran.kategori.index')
-                         ->with('success', 'Kategori berhasil diperbarui!');
+        try {
+            $kategori->update($request->all());
+            return redirect()->route('dashboard.restoran.kategori.index')
+                             ->with('success', 'Kategori berhasil diperbarui!');
+        } catch (\Exception $e) {
+            Log::error("Gagal Update Kategori: " . $e->getMessage());
+            return back()->with('error', 'Gagal memperbarui kategori.')->withInput();
+        }
     }
 
     /**
-     * Hapus Kategori (DESTROY - Soft Delete)
+     * 6. HAPUS KATEGORI (SOFT DELETE)
+     * Proteksi: Tidak boleh menghapus kategori yang masih memiliki menu.
      */
     public function destroy($id)
     {
         $kategori = KategoriMenu::findOrFail($id);
 
-        // Validasi: Cek apakah ada menu yang masih menggunakan kategori ini
+        // Validasi: Cek relasi ke tabel menu
+        // Pastikan di model KategoriMenu sudah ada function menus()
         if ($kategori->menus()->count() > 0) {
-            return redirect()->back()->with('error', 'Gagal! Kategori masih digunakan oleh beberapa menu.');
+            return redirect()->back()->with('error', 'Gagal Menghapus! Kategori "' . $kategori->nama_kategori . '" masih digunakan oleh ' . $kategori->menus()->count() . ' menu. Pindahkan atau hapus menu terlebih dahulu.');
         }
 
-        $kategori->delete(); // Soft Delete (mengisi deleted_at)
-
-        return redirect()->route('dashboard.restoran.kategori.index')
-                         ->with('success', 'Kategori berhasil dinonaktifkan.');
+        try {
+            $kategori->delete();
+            return redirect()->route('dashboard.restoran.kategori.index')
+                             ->with('success', 'Kategori berhasil dinonaktifkan.');
+        } catch (\Exception $e) {
+            Log::error("Gagal Hapus Kategori: " . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan sistem saat menghapus.');
+        }
     }
 }

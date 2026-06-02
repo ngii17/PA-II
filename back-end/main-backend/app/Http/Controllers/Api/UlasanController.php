@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
-// --- IMPORT MODEL ---
+// --- IMPORT SEMUA MODEL (PASTIKAN TIDAK ADA YANG KURANG) ---
 use App\Models\hotel\UlasanHotel;
 use App\Models\hotel\Reservasi;
 use App\Models\hotel\TipeKamar;
@@ -27,15 +27,15 @@ class UlasanController extends Controller
      */
 
     /**
-     * SIMPAN ULASAN HOTEL
-     * Syarat: Status 4 (Selesai) & Kunci per Reservasi ID
+     * 1.1 SIMPAN ULASAN HOTEL
+     * Kunci: Berdasarkan reservasi_id agar 1 transaksi hanya 1 ulasan.
      */
     public function storeHotelReview(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'user_id'       => 'required',
             'tipe_kamar_id' => 'required|exists:tipe_kamar,id',
-            'reservasi_id'  => 'required|exists:reservasi,id', 
+            'reservasi_id'  => 'required|exists:reservasi,id', // ID Transaksi Unik
             'rating'        => 'required|integer|min:1|max:5',
             'komentar'      => 'required|string|min:5',
             'is_anonymous'  => 'required|boolean',
@@ -45,19 +45,20 @@ class UlasanController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        // 1. Cek apakah transaksi ini sudah pernah diulas
-        if (UlasanHotel::where('reservasi_id', $request->reservasi_id)->exists()) {
+        // CEK APAKAH RESERVASI INI SUDAH PERNAH DIULAS
+        $exists = UlasanHotel::where('reservasi_id', $request->reservasi_id)->exists();
+        if ($exists) {
             return response()->json(['success' => false, 'message' => 'Reservasi ini sudah Anda ulas sebelumnya.'], 400);
         }
 
-        // 2. Cek kelayakan (Harus Selesai / ID 4)
+        // Cek apakah reservasi sudah SELESAI (Status 4)
         $reservasi = Reservasi::where('id', $request->reservasi_id)
             ->where('user_id', $request->user_id)
             ->where('status_reservasi_id', 4)
             ->first();
 
         if (!$reservasi) {
-            return response()->json(['success' => false, 'message' => 'Ulasan hanya bisa dikirim setelah Anda Check-out (Selesai).'], 403);
+            return response()->json(['success' => false, 'message' => 'Ulasan hanya bisa diberikan setelah Anda Check-out.'], 403);
         }
 
         UlasanHotel::create([
@@ -74,12 +75,12 @@ class UlasanController extends Controller
     }
 
     /**
-     * EDIT ULASAN HOTEL
+     * 1.2 EDIT ULASAN HOTEL
      */
     public function updateHotelReview(Request $request, $id)
     {
         $ulasan = UlasanHotel::where('id', $id)->where('user_id', $request->user_id)->first();
-        if (!$ulasan) return response()->json(['success' => false, 'message' => 'Ulasan tidak ditemukan.'], 403);
+        if (!$ulasan) return response()->json(['success' => false, 'message' => 'Ulasan tidak ditemukan atau Anda tidak berhak.'], 403);
 
         $ulasan->update([
             'rating'       => $request->rating,
@@ -87,57 +88,43 @@ class UlasanController extends Controller
             'is_anonymous' => $request->is_anonymous
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Ulasan hotel diperbarui!']);
+        return response()->json(['success' => true, 'message' => 'Ulasan hotel berhasil diperbarui!']);
     }
 
     /**
-     * HAPUS ULASAN HOTEL
+     * 1.3 HAPUS ULASAN HOTEL
      */
     public function destroyHotelReview(Request $request, $id)
     {
         $ulasan = UlasanHotel::where('id', $id)->where('user_id', $request->user_id)->first();
-        if (!$ulasan) return response()->json(['success' => false, 'message' => 'Gagal menghapus.'], 403);
+        if (!$ulasan) return response()->json(['success' => false, 'message' => 'Gagal menghapus ulasan.'], 403);
 
         $ulasan->delete();
         return response()->json(['success' => true, 'message' => 'Ulasan hotel telah dihapus.']);
     }
 
     /**
-     * AMBIL DAFTAR ULASAN HOTEL
-     */
-    /**
-     * 2. AMBIL DAFTAR ULASAN HOTEL (SINKRON NAMA USER & ANONIM)
+     * 1.4 AMBIL DAFTAR ULASAN HOTEL (SINKRON NAMA USER)
      */
     public function getHotelReviews($tipeKamarId)
     {
         try {
-            // 1. Ambil ulasan dari tabel ulasan_hotel
             $ulasan = UlasanHotel::where('tipe_kamar_id', $tipeKamarId)
                 ->where('is_hidden', false)
                 ->orderBy('created_at', 'desc')
                 ->get();
 
-            // 2. Ambil data user dari Auth Service (Port 8000)
+            // Ambil data user dari Auth-Service
             $users = $this->getUsersFromAuth(); 
 
-            // 3. Mapping data ulasan dengan nama asli user
             $data = $ulasan->map(function($u) use ($users) {
-                // Cari data user berdasarkan user_id pengulas
                 $user = $users->get($u->user_id);
-                
-                // Ambil full_name, jika tidak ada pakai username, jika tidak ada baru fallback
-                $namaAsli = "Pelanggan Purnama"; 
-                if ($user) {
-                    $namaAsli = $user['full_name'] ?? ($user['username'] ?? 'Pelanggan Purnama');
-                }
+                $namaAsli = $user['full_name'] ?? ($user['username'] ?? 'Pelanggan Purnama');
 
                 return [
                     'rating'    => $u->rating,
                     'komentar'  => $u->komentar,
-                    // KUNCI: Gunakan sensor jika is_anonymous bernilai true (1)
-                    'nama_user' => ($u->is_anonymous == 1 || $u->is_anonymous == true) 
-                                    ? $this->sensorName($namaAsli) 
-                                    : $namaAsli,
+                    'nama_user' => $u->is_anonymous ? $this->sensorName($namaAsli) : $namaAsli,
                     'tanggal'   => $u->created_at->format('d M Y')
                 ];
             });
@@ -155,8 +142,8 @@ class UlasanController extends Controller
      */
 
     /**
-     * SIMPAN ULASAN RESTORAN
-     * Syarat: Status 2 (Lunas) & Kunci per Item dalam Nota
+     * 2.1 SIMPAN ULASAN RESTORAN
+     * Kunci: Berdasarkan pesanan_menu_id agar 1 menu di 1 nota hanya 1 ulasan.
      */
     public function storeRestoReview(Request $request)
     {
@@ -173,11 +160,21 @@ class UlasanController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        if (UlasanRestoran::where('pesanan_menu_id', $request->pesanan_menu_id)->where('menu_id', $request->menu_id)->exists()) {
+        // CEK APAKAH MENU PADA NOTA INI SUDAH DIULAS
+        $exists = UlasanRestoran::where('pesanan_menu_id', $request->pesanan_menu_id)
+            ->where('menu_id', $request->menu_id)
+            ->exists();
+
+        if ($exists) {
             return response()->json(['success' => false, 'message' => 'Menu pada pesanan ini sudah Anda ulas.'], 400);
         }
 
-        $sudahBayar = PesananMenu::where('id', $request->pesanan_menu_id)->where('user_id', $request->user_id)->where('status_pembayaran_id', 2)->exists();
+        // Cek Pembayaran Lunas (Status 2)
+        $sudahBayar = PesananMenu::where('id', $request->pesanan_menu_id)
+            ->where('user_id', $request->user_id)
+            ->where('status_pembayaran_id', 2)
+            ->exists();
+
         if (!$sudahBayar) {
             return response()->json(['success' => false, 'message' => 'Ulasan hanya tersedia untuk pesanan yang sudah lunas.'], 403);
         }
@@ -196,12 +193,12 @@ class UlasanController extends Controller
     }
 
     /**
-     * EDIT ULASAN RESTORAN
+     * 2.2 EDIT ULASAN RESTORAN
      */
     public function updateRestoReview(Request $request, $id)
     {
         $ulasan = UlasanRestoran::where('id', $id)->where('user_id', $request->user_id)->first();
-        if (!$ulasan) return response()->json(['success' => false, 'message' => 'Ulasan tidak ditemukan.'], 403);
+        if (!$ulasan) return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
 
         $ulasan->update([
             'rating'       => $request->rating,
@@ -213,7 +210,7 @@ class UlasanController extends Controller
     }
 
     /**
-     * HAPUS ULASAN RESTORAN
+     * 2.3 HAPUS ULASAN RESTORAN
      */
     public function destroyRestoReview(Request $request, $id)
     {
@@ -225,12 +222,16 @@ class UlasanController extends Controller
     }
 
     /**
-     * AMBIL DAFTAR ULASAN RESTORAN
+     * 2.4 AMBIL DAFTAR ULASAN RESTORAN (SINKRON NAMA USER)
      */
     public function getRestoReviews($menuId)
     {
         try {
-            $reviews = UlasanRestoran::where('menu_id', $menuId)->where('is_hidden', false)->orderBy('created_at', 'desc')->get();
+            $reviews = UlasanRestoran::where('menu_id', $menuId)
+                ->where('is_hidden', false)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
             $users = $this->getUsersFromAuth();
 
             $data = $reviews->map(function($u) use ($users) {
@@ -253,24 +254,37 @@ class UlasanController extends Controller
 
     /**
      * ============================================================
-     * BAGIAN 3: FUNGSI HELPER (PENDUKUNG)
+     * BAGIAN 3: FUNGSI HELPER (PROSES INTERNAL)
      * ============================================================
      */
 
+    /**
+     * Helper untuk mengambil data user dari Auth-Service (Port 8000)
+     */
+    /**
+     * Ambil data user dari Auth-Service secara dinamis
+     */
     private function getUsersFromAuth()
     {
         try {
-            // URL sesuai IP laptop Anda yang sekarang
-            $res = Http::timeout(5)->get("http://10.187.82.132:8000/api/internal/user-tokens");
+            // Kita ambil URL dari .env, jika tidak ada default ke localhost
+            $baseUrl = env('AUTH_SERVICE_URL', 'http://127.0.0.1:8000');
+            
+            $url = $baseUrl . "/api/internal/user-tokens";
+            
+            $res = Http::timeout(5)->get($url);
+            
             if ($res->successful()) {
                 return collect($res->json('data'))->keyBy('user_id');
             }
         } catch (\Exception $e) {
-            Log::error("SINKRON_NAMA_GAGAL: " . $e->getMessage());
+            Log::error("SINKRON_NAMA_GAGAL: Cek IP di .env kamu. Pesan: " . $e->getMessage());
         }
         return collect();
     }
-
+    /**
+     * Helper untuk sensor nama (Anonim)
+     */
     private function sensorName($name) {
         $parts = explode(' ', $name);
         $censoredParts = array_map(function($part) {

@@ -13,7 +13,7 @@ class MenuEventController extends Controller
 {
     public function index()
     {
-        $menuEvents = \DB::table('event_menu')
+        $menuEvents = DB::table('event_menu')
             ->join('events', 'event_menu.event_id', '=', 'events.id')
             ->join('menu', 'event_menu.menu_id', '=', 'menu.id')
             ->whereNull('event_menu.deleted_at') // Filter data terhapus
@@ -36,7 +36,7 @@ class MenuEventController extends Controller
     // =========================
     public function show($id)
     {
-        $menuEvent = \DB::table('event_menu')
+        $menuEvent = DB::table('event_menu')
             ->join('events', 'event_menu.event_id', '=', 'events.id')
             ->join('menu', 'event_menu.menu_id', '=', 'menu.id')
             ->where('event_menu.id', $id)

@@ -61,7 +61,7 @@ class PesananController extends Controller
         return view('dashboard.restoran.pesanan.create', compact('customers', 'menus'));
     }
 
-    // 4. SIMPAN DATA (STORE)
+    // 4. SIMPAN DATA (STORE) + SINKRONISASI STOK
     public function store(Request $request)
     {
         $request->validate([
@@ -73,21 +73,28 @@ class PesananController extends Controller
 
         DB::beginTransaction();
         try {
-            // FIX: Gunakan 'nomor_lokasi' (kolom DB) untuk menyimpan input 'nomor_meja'
             $pesanan = PesananMenu::create([
                 'user_id'           => $request->user_id,
-                'nomor_lokasi'      => $request->nomor_meja, // <--- PERBAIKAN SINKRONISASI
+                'nomor_lokasi'      => $request->nomor_meja,
                 'total_harga'       => 0,
                 'metode_pembayaran' => $request->metode_pembayaran ?? 'Tunai',
                 'status_pembayaran_id' => 1,
                 'status_pesanan_id'    => 1,
-                'tipe_pengantaran'  => 'Meja', // Default jika buat dari dashboard resto
+                'tipe_pengantaran'  => 'Meja',
+                'fcm_token'         => null, 
             ]);
 
             $total = 0;
             foreach ($request->menu_ids as $key => $mId) {
                 $menu = Menu::find($mId);
                 $qty = $request->jumlah[$key];
+
+                // --- SINKRONISASI STOK: Kurangi stok di database ---
+                if ($menu->stok < $qty) {
+                    throw new \Exception("Stok {$menu->nama_menu} tidak mencukupi.");
+                }
+                $menu->decrement('stok', $qty);
+
                 DetailPesanan::create([
                     'pesanan_menu_id' => $pesanan->id,
                     'menu_id' => $mId,
@@ -100,7 +107,7 @@ class PesananController extends Controller
             $pesanan->update(['total_harga' => $total]);
 
             DB::commit();
-            return redirect()->route('dashboard.restoran.pesanan.index')->with('success', 'Pesanan Meja ' . $request->nomor_meja . ' berhasil dibuat!');
+            return redirect()->route('dashboard.restoran.pesanan.index')->with('success', 'Pesanan berhasil dibuat & Stok telah dipotong.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Gagal: ' . $e->getMessage());
@@ -120,27 +127,50 @@ class PesananController extends Controller
         return view('dashboard.restoran.pesanan.edit', compact('pesanan', 'statusList', 'paymentStatusList'));
     }
 
-    // 6. UPDATE DATA (DENGAN FIX KOLOM nomor_lokasi)
+    // 6. UPDATE DATA + SINKRONISASI NOTIFIKASI
     public function update(Request $request, $id)
     {
         $pesanan = PesananMenu::findOrFail($id);
         
-        // Simpan status lama untuk pemicu notifikasi
         $statusPesananLama = $pesanan->status_pesanan_id;
         $statusBayarLama   = $pesanan->status_pembayaran_id;
 
+        $request->validate([
+            'nomor_meja' => 'required|string',
+            'status_pesanan_id' => 'required|exists:status_pesanan,id',
+            'status_pembayaran_id' => 'required|exists:status_pembayaran,id',
+        ]);
+
         $pesanan->update([
             'nomor_lokasi'         => $request->nomor_meja,
-            'status_pesanan_id'    => $request->status_pesanan_id, // <--- SEKARANG INI SUDAH ADA DI DB
+            'status_pesanan_id'    => $request->status_pesanan_id,
             'status_pembayaran_id' => $request->status_pembayaran_id,
         ]);
 
-        // ... (Logika notifikasi ke HP tetap di bawah sini) ...
+        // ============================================================
+        // --- LOGIKA PEMICU NOTIFIKASI SINKRON HP ---
+        // ============================================================
+        
+        // A. JIKA STATUS BERUBAH JADI "DISAJIKAN" (ID 3)
         if ($statusPesananLama != 3 && $request->status_pesanan_id == 3) {
-             $this->notifService->orderReady($pesanan->fcm_token, $pesanan->user_id, $pesanan->id);
+             try {
+                 $this->notifService->orderReady($pesanan->fcm_token ?? 'no_token', $pesanan->user_id, $pesanan->id);
+             } catch (\Exception $e) { Log::error("Notif Error: " . $e->getMessage()); }
+        }
+
+        // B. JIKA STATUS BAYAR BERUBAH JADI "LUNAS" (ID 2)
+        if ($statusBayarLama != 2 && $request->status_pembayaran_id == 2) {
+            try {
+                $this->notifService->orderConfirmed(
+                    $pesanan->fcm_token ?? 'no_token', 
+                    $pesanan->user_id, 
+                    $pesanan->id, 
+                    (float)$pesanan->total_harga
+                );
+            } catch (\Exception $e) { Log::error("Notif Error: " . $e->getMessage()); }
         }
         
-        return redirect()->route('dashboard.restoran.pesanan.index')->with('success', 'Data diperbarui!');
+        return redirect()->route('dashboard.restoran.pesanan.index')->with('success', 'Status Pesanan & Notifikasi Berhasil Diperbarui!');
     }
 
     // 7. HAPUS / BATALKAN
