@@ -115,10 +115,10 @@ class _DetailNotificationScreenState extends State<DetailNotificationScreen> {
             headerIcon = Icons.exit_to_app;
           }
           // Tipe Umum
-          else if (data['type'] == 'broadcast') {
-            typeLabel = "PROMO TERBARU";
-            headerIcon = Icons.star;
-          }
+          else if (data['type'] == 'broadcast_admin') {
+    typeLabel = "PENGUMUMAN RESMI";
+    headerIcon = Icons.info_outline;
+}
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(25),

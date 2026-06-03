@@ -47,10 +47,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
         return Icons.verified_user_outlined; // Ikon lunas/terverifikasi
       case 'order_ready': 
         return Icons.restaurant_menu;
-      case 'broadcast': 
-        return Icons.campaign_outlined; // Ikon promo admin
-      default: 
-        return Icons.notifications_active_outlined;
+      case 'broadcast_admin': 
+      return Icons.campaign; // Ikon Toa / Pengeras Suara
+    default: 
+      return Icons.notifications;
     }
   }
 
