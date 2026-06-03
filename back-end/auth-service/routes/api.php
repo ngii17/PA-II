@@ -41,4 +41,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 3. Alamat untuk ambil semua user
     Route::get('/users', [AuthController::class, 'getAllUsers']);
+    // Di api.php Port 8000
+    Route::post('/internal/create-staff', [AuthController::class, 'storeStaff']);
+
+    // Port 8000 - api.php
+    Route::post('/internal/create-staff', [App\Http\Controllers\Api\AuthController::class, 'storeStaff']);
 });

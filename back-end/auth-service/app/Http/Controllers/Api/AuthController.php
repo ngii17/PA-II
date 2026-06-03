@@ -328,5 +328,6 @@ public function login(Request $request)
             ], 500);
         }
     }
+    
 
 }

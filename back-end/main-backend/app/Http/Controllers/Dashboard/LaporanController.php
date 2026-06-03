@@ -7,39 +7,49 @@ use App\Models\hotel\Reservasi;
 use App\Models\restoran\PesananMenu;
 use App\Exports\LaporanHotelExport;
 use App\Exports\LaporanRestoranExport;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\DB; // WAJIB ADA untuk selectRaw
+use Barryvdh\DomPDF\Facade\Pdf as PDF; 
+use Maatwebsite\Excel\Facades\Excel as Excel;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class LaporanController extends Controller
 {
     /**
-     * TAMPILAN UTAMA LAPORAN (STATISTIK & GRAFIK)
+     * 1. TAMPILAN UTAMA LAPORAN (STATISTIK & GRAFIK)
      */
     public function index()
     {
-        // ID Status Sukses (2: Terbayar, 3: Selesai)
-        $statusSuksesHotel = [2, 3];
+        // PENGAMANAN: Hanya Admin yang bisa masuk
+        if (session('user.role') !== 'admin') {
+            return abort(403, 'Akses Terbatas: Laporan hanya dapat diakses oleh Admin.');
+        }
+
+        // SINKRONISASI: Status sukses (Hotel: Terbayar, Check-in, Selesai | Resto: Lunas)
+        $statusLunasHotel = [2, 3, 4];
+        $statusLunasResto = [2];
 
         // 1. Hitung Total Pendapatan
-        $totalHotel = Reservasi::whereIn('status_reservasi_id', $statusSuksesHotel)->sum('total_harga');
-        $totalRestoran = PesananMenu::where('status_pembayaran_id', 2)->sum('total_harga');
+        $totalHotel = Reservasi::whereIn('status_reservasi_id', $statusLunasHotel)->sum('total_harga');
+        $totalRestoran = PesananMenu::whereIn('status_pembayaran_id', $statusLunasResto)->sum('total_harga');
 
         // 2. Statistik Transaksi
-        $totalTransaksiHotel = Reservasi::whereIn('status_reservasi_id', $statusSuksesHotel)->count();
-        $totalTransaksiRestoran = PesananMenu::where('status_pembayaran_id', 2)->count();
+        $totalTransaksiHotel = Reservasi::whereIn('status_reservasi_id', $statusLunasHotel)->count();
+        $totalTransaksiRestoran = PesananMenu::whereIn('status_pembayaran_id', $statusLunasResto)->count();
+        
+        // FIX ERROR VIEW: Sediakan variabel yang diminta oleh Dashboard utama kamu
+        $totalPesanan = $totalTransaksiRestoran;
 
         // 3. Logika Grafik (6 Bulan Terakhir)
-        // Kita buat label bulan dulu agar grafik urut dan tidak kosong jika ada bulan yang 0 transaksi
         $bulanLabels = collect(range(5, 0))->map(function($i) {
             return now()->subMonths($i)->format('M Y');
         })->values();
 
-        // Data Grafik Hotel
+        // Data Grafik Hotel (PostgreSQL format)
         $rawHotel = Reservasi::selectRaw("TO_CHAR(created_at, 'Mon YYYY') as bulan, COUNT(*) as total")
             ->where('created_at', '>=', now()->subMonths(6))
-            ->whereIn('status_reservasi_id', $statusSuksesHotel)
+            ->whereIn('status_reservasi_id', $statusLunasHotel)
             ->groupByRaw("TO_CHAR(created_at, 'Mon YYYY')")
             ->get();
 
@@ -50,7 +60,7 @@ class LaporanController extends Controller
         // Data Grafik Restoran
         $rawResto = PesananMenu::selectRaw("TO_CHAR(created_at, 'Mon YYYY') as bulan, COUNT(*) as total")
             ->where('created_at', '>=', now()->subMonths(6))
-            ->where('status_pembayaran_id', 2)
+            ->whereIn('status_pembayaran_id', $statusLunasResto)
             ->groupByRaw("TO_CHAR(created_at, 'Mon YYYY')")
             ->get();
 
@@ -60,12 +70,13 @@ class LaporanController extends Controller
 
         return view('dashboard.laporan.index', compact(
             'totalHotel', 'totalRestoran', 'reservasiPerBulan',
-            'pesananPerBulan', 'totalTransaksiHotel', 'totalTransaksiRestoran', 'bulanLabels'
+            'pesananPerBulan', 'totalTransaksiHotel', 'totalTransaksiRestoran', 
+            'totalPesanan', 'bulanLabels'
         ));
     }
 
     /**
-     * EXPORT EXCEL
+     * 2. EXPORT EXCEL
      */
     public function exportExcelHotel()
     {
@@ -78,52 +89,55 @@ class LaporanController extends Controller
     }
 
     /**
-     * EXPORT PDF HOTEL
+     * 3. EXPORT PDF HOTEL
      */
     public function exportPdfHotel()
     {
         $reservasi = Reservasi::with(['tipeKamar', 'statusReservasi'])
+            ->whereIn('status_reservasi_id', [2, 3, 4])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $totalPendapatan = $reservasi->whereIn('status_reservasi_id', [2, 3])->sum('total_harga');
-        $terbayarCount = $reservasi->whereIn('status_reservasi_id', [2, 3])->count();
+        $totalPendapatan = $reservasi->sum('total_harga');
+        $terbayarCount = $reservasi->count();
 
-        $pdf = Pdf::loadView('dashboard.laporan.pdf-hotel', compact(
+        $pdf = PDF::loadView('dashboard.laporan.pdf-hotel', compact(
             'reservasi', 'totalPendapatan', 'terbayarCount'
         ));
 
-        return $pdf->download('laporan-hotel.pdf');
+        return $pdf->download('laporan-hotel-purnama.pdf');
     }
 
     /**
-     * EXPORT PDF RESTORAN
+     * 4. EXPORT PDF RESTORAN (SINKRON NAMA DARI PORT 8000)
      */
     public function exportPdfRestoran()
     {
-        // 1. Ambil data pesanan
         $pesanan = PesananMenu::with(['details.menu'])
+            ->whereIn('status_pembayaran_id', [2])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // 2. Ambil data user dari microservice agar nama pelanggan muncul di PDF
-        $token = session('user.token');
+        // Ambil data user dari Auth-Service secara dinamis
+        $users = collect();
         try {
-            $response = Http::withToken($token)->get(env('MIKRO_URL') . '/api/users');
-            $users = collect($response->json('data') ?? [])->keyBy('id');
+            $token = session('user.token');
+            $baseUrl = env('MIKRO_URL', 'http://127.0.0.1:8000');
+            $response = Http::timeout(5)->withToken($token)->get($baseUrl . '/api/internal/user-tokens');
+            if ($response->successful()) {
+                $users = collect($response->json('data'))->keyBy('user_id');
+            }
         } catch (\Exception $e) {
-            $users = collect([]);
+            Log::error("Gagal sinkron nama untuk PDF Laporan: " . $e->getMessage());
         }
 
-        // 3. Hitung Statistik untuk Header PDF
         $totalPesanan = $pesanan->count();
-        $pesananLunas = $pesanan->where('status_pembayaran_id', 2)->count();
-        $totalPendapatan = $pesanan->where('status_pembayaran_id', 2)->sum('total_harga');
+        $totalPendapatan = $pesanan->sum('total_harga');
 
-        $pdf = Pdf::loadView('dashboard.laporan.pdf-restoran', compact(
-            'pesanan', 'users', 'totalPesanan', 'pesananLunas', 'totalPendapatan'
+        $pdf = PDF::loadView('dashboard.laporan.pdf-restoran', compact(
+            'pesanan', 'users', 'totalPesanan', 'totalPendapatan'
         ));
 
-        return $pdf->download('laporan-restoran.pdf');
+        return $pdf->download('laporan-restoran-purnama.pdf');
     }
 }

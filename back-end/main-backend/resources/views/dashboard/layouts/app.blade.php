@@ -35,15 +35,15 @@
     <div class="brand">🏨 Purnama Dashboard</div>
     <nav style="padding: 0 8px;">
 
-        {{-- LINK DASHBOARD UTAMA --}}
+        {{-- LINK DASHBOARD UTAMA (Bisa dilihat semua Role) --}}
         <a href="{{ route('dashboard.index') }}" class="nav-link {{ request()->routeIs('dashboard.index') ? 'active' : '' }}">
             <i class="fas fa-chart-line me-2"></i> Dashboard
         </a>
-
+{{-- ========================================== --}}
+        {{-- MENU KHUSUS ADMIN --}}
         {{-- ========================================== --}}
-        {{-- MENU KHUSUS ADMIN (Management Global) --}}
-        {{-- ========================================== --}}
-        @if(session('user.role') === 'admin')
+        {{-- Kita gunakan str_replace dan strtolower agar pengecekan lebih aman --}}
+        @if(str_replace('_', ' ', strtolower(session('user.role'))) === 'admin')
             <div class="menu-label">Admin Management</div>
             <a href="{{ route('dashboard.pengguna') }}" class="nav-link {{ request()->routeIs('dashboard.pengguna') ? 'active' : '' }}">
                 <i class="fas fa-users me-2"></i> Data Pengguna
@@ -57,15 +57,21 @@
             <a href="{{ route('dashboard.ulasan') }}" class="nav-link {{ request()->routeIs('dashboard.ulasan') ? 'active' : '' }}">
                 <i class="fas fa-star me-2"></i> Seluruh Ulasan
             </a>
+            <a href="{{ route('dashboard.event.index') }}" class="nav-link {{ request()->routeIs('dashboard.event*') ? 'active' : '' }}">
+                <i class="fas fa-magic me-2"></i> Tema Aplikasi
+            </a>
             <a href="{{ route('dashboard.laporan') }}" class="nav-link {{ request()->routeIs('dashboard.laporan') ? 'active' : '' }}">
                 <i class="fas fa-file-invoice-dollar me-2"></i> Laporan Sistem
             </a>
+            <a class="nav-link {{ request()->routeIs('dashboard.broadcast*') ? 'active' : '' }}" href="{{ route('dashboard.admin.broadcast.index') }}">
+    <div class="sb-nav-link-icon"><i class="fas fa-bullhorn text-warning"></i></div> Broadcast Notif
+</a>
         @endif
 
         {{-- ========================================== --}}
         {{-- MENU KHUSUS STAFF HOTEL --}}
         {{-- ========================================== --}}
-        @if(session('user.role') === 'staff_hotel')
+        @if(str_replace('_', ' ', strtolower(session('user.role'))) === 'staff hotel')
             <div class="menu-label">Hotel Management</div>
             <a href="{{ route('dashboard.hotel.kamar.index') }}" class="nav-link {{ request()->routeIs('dashboard.hotel.kamar*') ? 'active' : '' }}">
                 <i class="fas fa-bed me-2"></i> Data Kamar
@@ -85,39 +91,28 @@
         @endif
 
         {{-- ========================================== --}}
-        {{-- MENU KHUSUS STAFF RESTORAN (LENGKAP) --}}
+        {{-- MENU KHUSUS STAFF RESTORAN --}}
         {{-- ========================================== --}}
-        @if(session('user.role') === 'staff_restoran')
+        @if(str_replace('_', ' ', strtolower(session('user.role'))) === 'staff restoran')
             <div class="menu-label">Restoran Management</div>
-
             <a href="{{ route('dashboard.restoran.kategori.index') }}" class="nav-link {{ request()->routeIs('dashboard.restoran.kategori*') ? 'active' : '' }}">
                 <i class="fas fa-folder me-2"></i> Kategori Menu
             </a>
-
             <a href="{{ route('dashboard.restoran.menu.index') }}" class="nav-link {{ request()->routeIs('dashboard.restoran.menu.index') ? 'active' : '' }}">
                 <i class="fas fa-utensils me-2"></i> Menu Restoran
             </a>
-
             <a href="{{ route('dashboard.restoran.pesanan.index') }}" class="nav-link {{ request()->routeIs('dashboard.restoran.pesanan*') ? 'active' : '' }}">
                 <i class="fas fa-shopping-basket me-2"></i> Pesanan Restoran
             </a>
-
             <a href="{{ route('dashboard.restoran.stok') }}" class="nav-link {{ request()->routeIs('dashboard.restoran.stok*') ? 'active' : '' }}">
                 <i class="fas fa-box-open me-2"></i> Stok Menu
             </a>
-
             <a href="{{ route('dashboard.restoran.menu-event.index') }}" class="nav-link {{ request()->routeIs('dashboard.restoran.menu-event*') ? 'active' : '' }}">
                 <i class="fas fa-calendar-day me-2"></i> Menu Event
             </a>
-
-            <a href="{{ route('dashboard.restoran.event') }}" class="nav-link {{ request()->routeIs('dashboard.restoran.event*') ? 'active' : '' }}">
-                <i class="fas fa-magic me-2"></i> Event Restoran
-            </a>
-
             <a href="{{ route('dashboard.restoran.pembayaran') }}" class="nav-link {{ request()->routeIs('dashboard.restoran.pembayaran*') ? 'active' : '' }}">
                 <i class="fas fa-receipt me-2"></i> Pembayaran Restoran
             </a>
-
             <a href="{{ route('dashboard.restoran.ulasan') }}" class="nav-link {{ request()->routeIs('dashboard.restoran.ulasan*') ? 'active' : '' }}">
                 <i class="fas fa-comments me-2"></i> Ulasan Restoran
             </a>
@@ -136,7 +131,7 @@
             <div class="d-flex align-items-center gap-3 pe-auto" id="profileDropdown" data-bs-toggle="dropdown" style="cursor: pointer;">
                 <div class="text-end d-none d-md-block">
                     <div class="fw-bold text-dark" style="font-size: 13px; line-height: 1;">{{ session('user.name') }}</div>
-                    <small class="text-muted" style="font-size: 10px; text-transform: uppercase;">{{ str_replace('_', ' ', session('user.role')) }}</small>
+                    <small class="text-muted" style="font-size: 10px; text-transform: uppercase;">{{ session('user.role') }}</small>
                 </div>
                 <div class="bg-primary rounded-circle text-white d-flex align-items-center justify-content-center fw-bold shadow-sm"
                     style="width:38px; height:38px; font-size:14px; border: 2px solid #fff;">

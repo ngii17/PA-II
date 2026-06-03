@@ -1,15 +1,18 @@
 @extends('dashboard.layouts.app')
-@section('title', 'Event Restoran')
+@section('title', 'Manajemen Tema & Event')
 @section('content')
 
-<div class="container-fluid">
+<div class="container-fluid px-4">
     <div class="mb-4">
-        <h4 class="fw-bold mb-1">🏰 Event Restoran</h4>
-        <p class="text-muted small">Kelola informasi dan aktifkan tema visual aplikasi</p>
+        {{-- JUDUL DIPERBARUI: Karena dikelola Admin untuk seluruh sistem --}}
+        <h4 class="fw-bold mb-1">🎨 Manajemen Tema Aplikasi</h4>
+        <p class="text-muted small">Pilih dan aktifkan tema visual untuk mengubah suasana aplikasi secara instan.</p>
     </div>
 
     @if(session('success'))
-        <div class="alert alert-success border-0 shadow-sm mb-4">{{ session('success') }}</div>
+        <div class="alert alert-success border-0 shadow-sm mb-4" style="border-radius:12px;">
+            <i class="fas fa-check-circle me-2"></i> {{ session('success') }}
+        </div>
     @endif
 
     <div class="row g-4">
@@ -17,7 +20,7 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100" style="border-radius:20px; overflow:hidden;">
 
-                {{-- WARNA GRADIENT DIAMBIL DARI DATABASE ATAU MAPPING --}}
+                {{-- GRADIENT PREVIEW --}}
                 @php
                     $gradients = [
                         'imlek'    => 'linear-gradient(135deg, #f09819, #edde5d)',
@@ -32,27 +35,27 @@
 
                 <div style="height: 150px; background: {{ $bg }}; position: relative;">
                     @if($event->header_image)
-                        <img src="{{ $event->header_image }}" style="width:100%; height:100%; object-fit:cover; opacity: 0.2; position: absolute;">
+                        <img src="{{ $event->header_image }}" style="width:100%; height:100%; object-fit:cover; opacity: 0.3; position: absolute;">
                     @endif
                 </div>
 
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <h6 class="fw-bold mb-0">{{ $event->nama_event }}</h6>
-                        <span class="badge {{ $event->is_active ? 'bg-success' : 'bg-secondary' }}" style="font-size: 10px;">
-                            {{ $event->is_active ? 'Aktif' : 'Nonaktif' }}
+                        <span class="badge {{ $event->is_active ? 'bg-success' : 'bg-secondary' }}" style="font-size: 10px; border-radius: 8px;">
+                            {{ $event->is_active ? 'AKTIF' : 'OFF' }}
                         </span>
                     </div>
-                    <p class="text-muted small mb-0" style="font-size: 11px; min-height: 35px;">
-                        {{ $event->deskripsi ?? '-' }}
+                    <p class="text-muted small mb-0" style="font-size: 11px; min-height: 40px; line-height: 1.5;">
+                        {{ $event->deskripsi ?? 'Tidak ada deskripsi untuk tema ini.' }}
                     </p>
 
-                    <div class="mt-3">
-                        {{-- Tombol untuk pindah ke halaman Edit --}}
-                        <a href="{{ route('dashboard.restoran.event.edit', $event->id) }}"
+                    <div class="mt-3 pt-3 border-top">
+                        {{-- FIX ERROR: Menggunakan rute baru 'dashboard.event.edit' --}}
+                        <a href="{{ route('dashboard.event.edit', $event->id) }}"
                            class="btn btn-warning w-100 fw-bold py-2 shadow-sm"
                            style="border-radius:12px; background: #ffc107; border: none; color: #1a1a2e;">
-                            ✏️ Edit & Konfigurasi
+                            <i class="fas fa-cog me-1"></i> Edit & Aktifkan
                         </a>
                     </div>
                 </div>
