@@ -1,88 +1,114 @@
 import 'package:flutter/material.dart';
-import '../screens/restoran/menu_resto.dart';
+import '../screens/restoran/menu_resto.dart'; // Sesuaikan dengan path model Anda
 
 class CartProvider extends ChangeNotifier {
-  // Data asli penyimpanan objek menu
+  /// Map untuk menyimpan data objek menu utuh berdasarkan ID
   final Map<int, MenuResto> _cartItems = {};
-  // Data jumlah porsi per menu ID
+  
+  /// Map untuk menyimpan jumlah (quantity) berdasarkan ID
   final Map<int, int> _itemQuantities = {};
 
-  // --- GETTER UNTUK KEMUDAHAN AKSES ---
-  
-  // Digunakan di MenuListScreen & HomeScreen (badge)
-  Map<int, int> get items => _itemQuantities;
+  // ==========================================
+  // GETTER UNTUK UI
+  // ==========================================
 
-  // Digunakan di CartScreen & CheckoutScreen
+  /// Mendapatkan list unik menu yang ada di keranjang
+  List<MenuResto> get cartList => _cartItems.values.toList();
+
+  /// Mendapatkan jumlah per ID (untuk badge atau counter di list)
   Map<int, int> get itemQuantities => _itemQuantities;
+  Map<int, int> get items => _itemQuantities; // Alias untuk fleksibilitas
 
-  // SINKRONISASI: Menghitung total harga menggunakan hargaAkhir (setelah diskon)
-  double getTotalPrice() {
+  /// Menghitung total item porsi (untuk badge di ikon keranjang belanja)
+  int get totalItems {
+    int total = 0;
+    _itemQuantities.forEach((_, qty) => total += qty);
+    return total;
+  }
+
+  /// SINKRONISASI BACKEND: Menghitung total harga yang harus dibayar
+  /// Menggunakan [hargaAkhir] (Harga setelah diskon/promo)
+  double get totalPrice {
     double total = 0;
     _itemQuantities.forEach((id, qty) {
       if (_cartItems.containsKey(id)) {
-        // Menggunakan hargaAkhir agar sinkron dengan promo 3% (atau promo lainnya)
         total += (_cartItems[id]!.hargaAkhir * qty);
       }
     });
     return total;
   }
 
-  // Getter properti untuk digunakan di UI (CartScreen)
-  double get totalPrice => getTotalPrice();
+   // Method Alias (agar tidak error saat dipanggil: cartProvider.getTotalPrice())
+  double getTotalPrice() => totalPrice;
 
-  // Daftar menu unik untuk ditampilkan di halaman keranjang
-  List<MenuResto> get cartList => _cartItems.values.toList();
-
-  // Hitung jumlah total porsi secara keseluruhan (untuk angka di ikon keranjang)
-  int get totalItems {
-    int total = 0;
-    _itemQuantities.forEach((key, value) => total += value);
+  /// OPSIONAL: Menghitung total harga asli sebelum diskon
+  /// Berguna jika Anda ingin menampilkan "Hemat Rp xxx" di UI
+  double get totalOriginalPrice {
+    double total = 0;
+    _itemQuantities.forEach((id, qty) {
+      if (_cartItems.containsKey(id)) {
+        total += (_cartItems[id]!.hargaAsli * qty);
+      }
+    });
     return total;
   }
 
-  // --- FUNGSI AKSI (LOGIKA MANIPULASI DATA) ---
+  /// Mendapatkan selisih total penghematan
+  double get totalSavings => totalOriginalPrice - totalPrice;
 
-  // 1. Fungsi Tambah (Increment +1)
+  // ==========================================
+  // LOGIKA MANIPULASI DATA (AKSI)
+  // ==========================================
+
+  /// 1. Tambah ke Keranjang (Increment)
   void addToCart(MenuResto menu) {
     if (_itemQuantities.containsKey(menu.id)) {
       _itemQuantities[menu.id] = _itemQuantities[menu.id]! + 1;
+      // Update objek menu untuk memastikan harga/promo terbaru dari backend tersimpan
+      _cartItems[menu.id] = menu; 
     } else {
       _cartItems[menu.id] = menu;
       _itemQuantities[menu.id] = 1;
     }
-    notifyListeners(); // Update semua layar yang mendengarkan (Home, Resto, dll)
+    notifyListeners();
   }
 
-  // 2. Fungsi Kurang (Decrement -1)
+  /// 2. Kurangi dari Keranjang (Decrement)
   void removeFromCart(int menuId) {
     if (_itemQuantities.containsKey(menuId)) {
       if (_itemQuantities[menuId]! > 1) {
         _itemQuantities[menuId] = _itemQuantities[menuId]! - 1;
       } else {
-        // Jika porsi tinggal 1 dan dikurangi, hapus total dari keranjang
+        // Jika sisa 1, hapus permanen dari map
         _itemQuantities.remove(menuId);
         _cartItems.remove(menuId);
       }
+      notifyListeners();
     }
-    notifyListeners();
   }
 
-  // 3. FUNGSI SET QUANTITY (Digunakan oleh MenuDetailScreen)
-  // Digunakan saat user mengatur jumlah banyak sekaligus lewat halaman Detail
+  /// 3. Atur Jumlah Secara Spesifik (Set Quantity)
+  /// Digunakan di halaman Detail Menu atau Input Manual
   void setQuantity(MenuResto menu, int qty) {
     if (qty > 0) {
       _cartItems[menu.id] = menu;
       _itemQuantities[menu.id] = qty;
     } else {
-      // Jika qty disetel 0, hapus dari keranjang
       _itemQuantities.remove(menu.id);
       _cartItems.remove(menu.id);
     }
     notifyListeners();
   }
 
-  // 4. Kosongkan Keranjang
-  // Dipanggil setelah proses checkout sukses atau user melakukan logout
+  /// 4. Hapus Satu Baris Menu (Delete Item)
+  /// Digunakan jika ada tombol "Hapus" (tong sampah) di keranjang
+  void deleteItem(int menuId) {
+    _itemQuantities.remove(menuId);
+    _cartItems.remove(menuId);
+    notifyListeners();
+  }
+
+  /// 5. Reset Keranjang
   void clearCart() {
     _cartItems.clear();
     _itemQuantities.clear();

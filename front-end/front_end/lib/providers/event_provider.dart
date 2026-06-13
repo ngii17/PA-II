@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../services/api_services.dart';
-import 'package:flutter/material.dart';
 
 class EventProvider extends ChangeNotifier {
   // 1. Variabel penampung seluruh data tema dari Laravel
+  // Default menggunakan warna brand Purnama: Navy & Gold Premium
   Map<String, dynamic> _activeTheme = {
     'event_code': 'default',
-    'primary_color': '#448AFF',   // Biru Standar
-    'secondary_color': '#E3F2FD', // Biru Muda
+    'primary_color': '#00197D',   // Navy Purnama
+    'secondary_color': '#D4AF37', // Gold Premium
     'header_image': null,
     'decoration_image': null,
   };
@@ -35,21 +35,14 @@ class EventProvider extends ChangeNotifier {
     }
   }
 
-
-  // Tambahkan getter untuk Primary Color
+  // Tambahkan getter untuk Primary Color (fallback ke Navy)
   Color get primaryColor {
-    if (activeTheme != null && activeTheme['primary_color'] != null) {
-      return _parseHexColor(activeTheme['primary_color']);
-    }
-    return const Color(0xFF1B5E20); // Fallback warna hijau jika data null
+    return _parseHexColor(_activeTheme['primary_color'] ?? '#00197D');
   }
 
-  // Tambahkan getter untuk Secondary Color
+  // Tambahkan getter untuk Secondary Color (fallback ke Gold)
   Color get secondaryColor {
-    if (activeTheme != null && activeTheme['secondary_color'] != null) {
-      return _parseHexColor(activeTheme['secondary_color']);
-    }
-    return const Color(0xFFFDD835); // Fallback warna kuning jika data null
+    return _parseHexColor(_activeTheme['secondary_color'] ?? '#D4AF37');
   }
 
   // Fungsi pembantu untuk mengubah String Hex ke Color Flutter
@@ -59,6 +52,4 @@ class EventProvider extends ChangeNotifier {
     buffer.write(hexString.replaceFirst('#', ''));
     return Color(int.parse(buffer.toString(), radix: 16));
   }
-
-  
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
-import 'detail_notification_screen.dart'; // Pastikan import ini ada
+import '../../providers/event_provider.dart';
+import 'detail_notification_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -12,7 +14,7 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   late Future<Map<String, dynamic>> _inboxData;
-  int _currentUserId = 0; // Simpan userId di sini
+  int _currentUserId = 0;
 
   @override
   void initState() {
@@ -28,145 +30,188 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   Future<Map<String, dynamic>> _loadData() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    _currentUserId = prefs.getInt('user_id') ?? 0; // Update userId global
+    _currentUserId = prefs.getInt('user_id') ?? 0;
     return ApiServices.getNotificationInbox(_currentUserId.toString());
   }
 
-  // Fungsi menentukan ikon berdasarkan tipe (Hotel & Restoran)
-  IconData _getIcon(String type) {
+  // Menentukan Ikon dan Warna berdasarkan tipe (Gabungan Hotel & Restoran)
+  Map<String, dynamic> _getNotifStyle(String type, Color primary) {
     switch (type) {
       // Hotel
-      case 'booking_confirmed': return Icons.check_circle_outline;
-      case 'booking_cancelled': return Icons.cancel_outlined;
-      case 'checkin_reminder': return Icons.hotel;
-      case 'checkout_reminder': return Icons.exit_to_app;
-      case 'payment_failed': return Icons.error_outline;
+      case 'booking_confirmed':
+        return {'icon': Icons.check_circle_rounded, 'color': Colors.green};
+      case 'booking_cancelled':
+        return {'icon': Icons.cancel_rounded, 'color': Colors.redAccent};
+      case 'checkin_reminder':
+      case 'hotel_checkin':
+        return {'icon': Icons.vpn_key_rounded, 'color': const Color(0xFFC9A227)};
+      case 'checkout_reminder':
+      case 'hotel_checkout':
+        return {'icon': Icons.exit_to_app_rounded, 'color': Colors.blueGrey};
+      
       // Restoran
-            // Restoran
-      case 'order_confirmed': 
-        return Icons.verified_user_outlined; // Ikon lunas/terverifikasi
-      case 'order_ready': 
-        return Icons.restaurant_menu;
-      case 'broadcast_admin': 
-      return Icons.campaign; // Ikon Toa / Pengeras Suara
-    default: 
-      return Icons.notifications;
+      case 'order_confirmed':
+        return {'icon': Icons.verified_user_rounded, 'color': Colors.blue};
+      case 'order_ready':
+        return {'icon': Icons.restaurant_menu_rounded, 'color': Colors.orangeAccent};
+      
+      // Umum / Admin
+      case 'broadcast_admin':
+      case 'broadcast':
+        return {'icon': Icons.campaign_rounded, 'color': primary};
+      
+      default:
+        return {'icon': Icons.notifications_active_rounded, 'color': primary};
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final ep = context.watch<EventProvider>();
+    final Color primary = ep.eventCode != 'default' ? ep.primaryColor : const Color(0xFF0C2D6B);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text("Kotak Masuk"),
-        backgroundColor: primaryColor,
+        title: const Text("Kotak Masuk", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+        centerTitle: true,
+        backgroundColor: primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _refreshInbox,
+            icon: const Icon(Icons.refresh_rounded),
+          )
+        ],
       ),
       body: RefreshIndicator(
+        color: primary,
         onRefresh: () async => _refreshInbox(),
         child: FutureBuilder<Map<String, dynamic>>(
           future: _inboxData,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(child: CircularProgressIndicator(color: primary));
             }
 
             if (snapshot.hasError) {
-              return const Center(child: Text("Gangguan koneksi ke server."));
+              return _buildErrorState();
             }
 
             final List<dynamic> notifications = snapshot.data?['data'] ?? [];
 
             if (notifications.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.mail_outline, size: 80, color: Colors.grey[300]),
-                    const SizedBox(height: 10),
-                    const Text("Belum ada pemberitahuan.", style: TextStyle(color: Colors.grey)),
-                  ],
-                ),
-              );
+              return _buildEmptyState();
             }
 
             return ListView.builder(
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               itemCount: notifications.length,
               itemBuilder: (context, index) {
                 final notif = notifications[index];
-                // Cek status is_read (jika ada di database) untuk menebalkan teks
-                bool isUnread = notif['is_read'] == false;
+                final style = _getNotifStyle(notif['type'] ?? "", primary);
+                final bool isUnread = notif['is_read'] == false || notif['is_read'] == 0;
                 
-                return Card(
-                  elevation: 0,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  color: isUnread ? Colors.white : Colors.grey[50], // Bedakan warna jika belum baca
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: isUnread ? primaryColor.withOpacity(0.3) : Colors.grey[200]!,
-                      width: isUnread ? 1.5 : 1,
-                    ),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      )
+                    ],
                   ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(15),
-                    onTap: () async {
-                      // --- NAVIGASI KE DETAIL ---
-                      final shouldRefresh = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DetailNotificationScreen(
-                            notifId: notif['id'],
-                            userId: _currentUserId,
-                          ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          left: BorderSide(
+                            color: isUnread ? style['color'] : Colors.grey[300]!, 
+                            width: 6
+                          )
                         ),
-                      );
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(18),
+                        onTap: () async {
+                          // Navigasi ke Detail
+                          final shouldRefresh = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DetailNotificationScreen(
+                                notifId: notif['id'],
+                                userId: _currentUserId,
+                              ),
+                            ),
+                          );
 
-                      // Jika kembali dari detail dan ada penghapusan, refresh list
-                      if (shouldRefresh == true) {
-                        _refreshInbox();
-                      } else {
-                        // Tetap refresh jika hanya ingin mengupdate status "is_read"
-                        _refreshInbox();
-                      }
-                    },
-                    leading: CircleAvatar(
-                      backgroundColor: primaryColor.withOpacity(0.1),
-                      child: Icon(_getIcon(notif['type']), color: primaryColor),
-                    ),
-                    title: Text(
-                      notif['title'] ?? "Info Terbaru",
-                      style: TextStyle(
-                        fontWeight: isUnread ? FontWeight.bold : FontWeight.normal, 
-                        fontSize: 16,
+                          // Refresh list saat kembali (untuk update status baca atau jika ada yang dihapus)
+                          _refreshInbox();
+                        },
+                        leading: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: (style['color'] as Color).withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(style['icon'], color: style['color'], size: 24),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                notif['title'] ?? "Pemberitahuan",
+                                style: TextStyle(
+                                  fontWeight: isUnread ? FontWeight.w900 : FontWeight.w600, 
+                                  fontSize: 15, 
+                                  color: isUnread ? Colors.black87 : Colors.grey[600]
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isUnread)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(color: primary, shape: BoxShape.circle),
+                              ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 6),
+                            Text(
+                              notif['body'] ?? "Anda mendapatkan info baru.",
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isUnread ? Colors.black54 : Colors.grey, 
+                                fontSize: 13, 
+                                height: 1.4
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time_rounded, size: 12, color: Colors.grey),
+                                const SizedBox(width: 5),
+                                Text(
+                                  _formatDate(notif['sent_at']),
+                                  style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 5),
-                        Text(
-                          notif['body'] ?? "", 
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.black87),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          notif['sent_at'] != null 
-                              ? notif['sent_at'].toString().substring(0, 16).replaceAll('T', ' ')
-                              : "",
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                    trailing: isUnread 
-                        ? Icon(Icons.circle, size: 10, color: primaryColor) 
-                        : null,
                   ),
                 );
               },
@@ -175,5 +220,67 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ),
       ),
     );
+  }
+
+  // --- WIDGET TAMPILAN KOSONG ---
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20)
+            ]),
+            child: Icon(Icons.mail_lock_rounded, size: 60, color: Colors.grey[300]),
+          ),
+          const SizedBox(height: 25),
+          const Text("Kotak Masuk Kosong", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.black87)),
+          const SizedBox(height: 10),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 50),
+            child: Text(
+              "Semua pemberitahuan tentang reservasi hotel dan pesanan restoran akan muncul di sini.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGET TAMPILAN ERROR ---
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.wifi_off_rounded, size: 60, color: Colors.redAccent),
+          const SizedBox(height: 15),
+          const Text("Gagal memuat data", style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 5),
+          TextButton(
+            onPressed: _refreshInbox, 
+            child: const Text("Coba Lagi", style: TextStyle(fontWeight: FontWeight.bold))
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper format tanggal sederhana
+  String _formatDate(dynamic date) {
+    if (date == null) return "-";
+    String d = date.toString();
+    try {
+      if (d.contains('T')) {
+        return d.substring(0, 16).replaceAll('T', ' ');
+      }
+      return d.substring(0, 16);
+    } catch (e) {
+      return d;
+    }
   }
 }

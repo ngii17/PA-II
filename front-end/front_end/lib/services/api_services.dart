@@ -6,26 +6,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Untuk rootBundle (baca file asset)
 import 'package:image_picker/image_picker.dart'; // Untuk ambil gambar dari galeri/kamera
 import 'package:firebase_messaging/firebase_messaging.dart';
-import  'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../notification/notification_service.dart'; // Import service notifikasi untuk ambil token
 import '../screens/event/app_theme.dart'; // Import AppTheme untuk konversi warna
-import '../screens/notification/notification_screen.dart'; // Import Screen Notifikasi untuk navigas
-import 'package:url_launcher/url_launcher.dart'; // Untuk buka URL eksternal (redirect pembayaran) 
-import 'package:firebase_messaging/firebase_messaging.dart';
+import '../screens/notification/notification_screen.dart'; // Import Screen Notifikasi untuk navigasi
+import 'package:url_launcher/url_launcher.dart'; // Untuk buka URL eksternal (redirect pembayaran)
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 
 
 
 
 class ApiServices {
+
+
+    static const String ipAddress = "10.84.44.132"; 
+
+  // 2. Sesuaikan baseUrl menggunakan variabel ipAddress di atas
+  static const String baseUrl = "http://$ipAddress:8001/api";
   // 1. Alamat Server Auth (Mikroservices - Port 8000)
-  static const String _authUrl = "http://10.106.80.132:8000/api";
+  static const String _authUrl = "http://$ipAddress:8000/api";
   
   // 2. Alamat Server Bisnis (Main Backend - Port 8001)
-  static const String _hotelUrl = "http://10.106.80.132:8001/api";
+  static const String _hotelUrl = "http://$ipAddress:8001/api";
 
   // 3. Alamat Server Notifikasi (Port 8002)
-  static const String _notifUrl = "http://10.106.80.132:8002/api";
+  static const String _notifUrl = "http://$ipAddress:8002/api";
 
   // ==========================================
   // FUNGSI KHUSUS HOTEL (Server Port 8001)
@@ -105,34 +112,34 @@ class ApiServices {
     }
   }
 
-static Future<Map<String, dynamic>> login(String email, String password) async {
-  try {
-    String? fcmToken = await FirebaseMessaging.instance.getToken();
-    
-    final response = await http.post(
-      Uri.parse("$_authUrl/login"),
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-      body: jsonEncode({
-        'email': email,
-        'password': password,
-        'fcm_token': fcmToken
-      }),
-    );
+  static Future<Map<String, dynamic>> login(String email, String password) async {
+    try {
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      
+      final response = await http.post(
+        Uri.parse("$_authUrl/login"),
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'fcm_token': fcmToken
+        }),
+      );
 
-    var data = jsonDecode(response.body);
-    
-    if (data['success'] == true) {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      // SIMPAN WAKTU LOGIN SEKARANG (dalam milidetik)
-      int loginTime = DateTime.now().millisecondsSinceEpoch;
-      await prefs.setInt('last_login_time', loginTime);
+      var data = jsonDecode(response.body);
+      
+      if (data['success'] == true) {
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        // SIMPAN WAKTU LOGIN SEKARANG (dalam milidetik)
+        int loginTime = DateTime.now().millisecondsSinceEpoch;
+        await prefs.setInt('last_login_time', loginTime);
+      }
+
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'Koneksi gagal: $e'};
     }
-
-    return data;
-  } catch (e) {
-    return {'success': false, 'message': 'Koneksi gagal: $e'};
   }
-}
 
   // 6. FUNGSI SIMPAN RESERVASI (Mengirim ke Main Backend - Port 8001)
   static Future<Map<String, dynamic>> storeReservation(Map<String, dynamic> data) async {
@@ -198,7 +205,6 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
   }
 
   // 9. FUNGSI CEK STATUS PEMBAYARAN (Polling ke Port 8001)
-  // Fungsi ini akan dipanggil oleh WaitingPaymentScreen setiap 3 detik
   static Future<Map<String, dynamic>> checkPaymentStatus(int reservasiId) async {
     try {
       final response = await http.get(
@@ -217,6 +223,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
       };
     }
   }
+
   // ==========================================
   // FUNGSI KHUSUS RESTORAN (Server Port 8001)
   // ==========================================
@@ -262,7 +269,6 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-
   // 11. Fungsi untuk cek status pembayaran restoran (Polling)
   static Future<Map<String, dynamic>> checkRestoOrderStatus(int orderId) async {
     try {
@@ -300,21 +306,17 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-
   // 13. Fungsi untuk mengambil data profil lengkap user (Dari Port 8000)
   static Future<Map<String, dynamic>> getUserProfile() async {
     try {
-      // 1. Ambil token dari memori HP
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('auth_token');
 
-      // 2. Kirim permintaan ke server Auth (Port 8000)
       final response = await http.get(
         Uri.parse("$_authUrl/user/profile"),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          // Sertakan Token sebagai bukti identitas yang valid
           'Authorization': 'Bearer $token', 
         },
       );
@@ -334,33 +336,28 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     required String fullName,
     required String phone,
     required String address,
-    File? imageFile, // File gambar bersifat opsional (boleh null)
+    File? imageFile,
   }) async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('auth_token');
 
-      // 1. Karena ada file, kita gunakan MultipartRequest
       var request = http.MultipartRequest('POST', Uri.parse("$_authUrl/user/update"));
 
-      // 2. Tambahkan Header (Token Akses)
       request.headers.addAll({
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
       });
 
-      // 3. Tambahkan Data Teks
       request.fields['username'] = username;
       request.fields['full_name'] = fullName;
       request.fields['phone'] = phone;
       request.fields['address'] = address;
 
-      // 4. Tambahkan File Gambar (Jika user memilih foto baru)
       if (imageFile != null) {
         request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
       }
 
-      // 5. Kirim data dan ambil respon
       var streamedResponse = await request.send();
       var response = await http.Response.fromStream(streamedResponse);
 
@@ -370,7 +367,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-  // 15. Fungsi Hapus Foto Profil (Langkah 2)
+  // 15. Fungsi Hapus Foto Profil
   static Future<Map<String, dynamic>> deleteProfilePhoto() async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -394,23 +391,18 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
   // FUNGSI KHUSUS ULASAN (Server Port 8001)
   // ==========================================
 
-  // ==========================================================
-  // 13 PERBAIKAN KIRIM ULASAN (Wajib Pakai Token)
-  // ==========================================================
   static Future<Map<String, dynamic>> storeHotelReview(Map<String, dynamic> data) async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      // Konsisten menggunakan 'access_token' sesuai hasil login
       String? token = prefs.getString('access_token');
 
       final response = await http.post(
-        Uri.parse("$_hotelUrl/review/hotel"), // Menembak Port 8001
+        Uri.parse("$_hotelUrl/review/hotel"),
         headers: {
           'Content-Type': 'application/json', 
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        // Data wajib berisi: user_id, tipe_kamar_id, reservasi_id, rating, komentar, is_anonymous
         body: jsonEncode(data),
       );
 
@@ -421,20 +413,18 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-  // 14. Kirim Ulasan Restoran
   static Future<Map<String, dynamic>> storeRestoReview(Map<String, dynamic> data) async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('access_token'); 
 
       final response = await http.post(
-        Uri.parse("$_hotelUrl/review/restoran"), // Menembak Port 8001
+        Uri.parse("$_hotelUrl/review/restoran"),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        // Data wajib berisi: user_id, menu_id, pesanan_menu_id, rating, komentar, is_anonymous
         body: jsonEncode(data),
       );
 
@@ -445,7 +435,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-// Edit Ulasan
+  // Edit Ulasan Restoran
   static Future<Map<String, dynamic>> updateRestoReview(int id, Map<String, dynamic> data) async {
     final response = await http.put(
       Uri.parse("$_hotelUrl/review/restoran/$id"),
@@ -455,7 +445,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     return jsonDecode(response.body);
   }
 
-  // Hapus Ulasan
+  // Hapus Ulasan Restoran
   static Future<Map<String, dynamic>> deleteRestoReview(int id, int userId) async {
     final response = await http.delete(
       Uri.parse("$_hotelUrl/review/restoran/$id?user_id=$userId"),
@@ -463,7 +453,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     return jsonDecode(response.body);
   }
   
-    // 15. Ambil Ulasan Hotel (Untuk Umum)
+  // Ambil Ulasan Hotel (Untuk Umum)
   static Future<Map<String, dynamic>> getHotelReviews(int tipeKamarId) async {
     try {
       final response = await http.get(Uri.parse("$_hotelUrl/review/hotel/$tipeKamarId"));
@@ -473,7 +463,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-  // 16. Ambil Ulasan Restoran (Untuk Umum)
+  // Ambil Ulasan Restoran (Untuk Umum)
   static Future<Map<String, dynamic>> getRestoReviews(int menuId) async {
     try {
       final response = await http.get(Uri.parse("$_hotelUrl/review/restoran/$menuId"));
@@ -482,7 +472,6 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
       return {'success': false, 'message': 'Gagal ambil ulasan: $e'};
     }
   }
-
 
   // 17. FUNGSI AMBIL TEMA EVENT YANG AKTIF (Port 8001)
   static Future<Map<String, dynamic>> getActiveEvent() async {
@@ -497,8 +486,6 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-
-
   // 18. FUNGSI CEK KODE PROMO MANUAL (Ke Port 8001)
   static Future<Map<String, dynamic>> checkPromoCode(String code, String category) async {
     try {
@@ -510,7 +497,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
         },
         body: jsonEncode({
           'kode_promo': code,
-          'kategori': category, // Isinya 'hotel' atau 'restoran'
+          'kategori': category,
         }),
       );
 
@@ -520,8 +507,7 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-
-   // 19. FUNGSI AMBIL INBOX NOTIFIKASI (Dari Port 8002)
+  // 19. FUNGSI AMBIL INBOX NOTIFIKASI (Dari Port 8002)
   static Future<Map<String, dynamic>> getNotificationInbox(String userId) async {
     try {
       final response = await http.get(
@@ -532,7 +518,6 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
         },
       );
 
-      // Kita gunakan handleResponse yang kita buat kemarin untuk debug
       if (response.body.startsWith('<')) {
          print("ERROR_HTML: ${response.body}");
          return {'success': false, 'message': 'Server Notif Error'};
@@ -547,12 +532,11 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-
-   // 20. FUNGSI AMBIL PROMO (Gunakan _baseUrl karena ini di Port 8001)
+  // 20. FUNGSI AMBIL PROMO (Gunakan _hotelUrl karena ini di Port 8001)
   static Future<Map<String, dynamic>> getActivePromo() async {
     try {
       final response = await http.get(
-        Uri.parse("$_hotelUrl/resto/active-promo"), // <-- Sekarang _baseUrl sudah dikenal
+        Uri.parse("$_hotelUrl/resto/active-promo"),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -564,26 +548,40 @@ static Future<Map<String, dynamic>> login(String email, String password) async {
     }
   }
 
-
+    // 21. FUNGSI AMBIL SEMUA PROMO AKTIF (untuk PromoScrollStrip di HomeScreen)
+  static Future<Map<String, dynamic>> getActivePromos() async {
+    try {
+      final response = await http.get(
+        Uri.parse("$_hotelUrl/promo/active"),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'data': [], 'message': e.toString()};
+    }
+  }
 
   // Detail Notifikasi
-static Future<Map<String, dynamic>> getNotificationDetail(int id, int userId) async {
-  final response = await http.get(Uri.parse("$_notifUrl/notifications/$id?user_id=$userId"));
-  return jsonDecode(response.body);
-}
+  static Future<Map<String, dynamic>> getNotificationDetail(int id, int userId) async {
+    final response = await http.get(Uri.parse("$_notifUrl/notifications/$id?user_id=$userId"));
+    return jsonDecode(response.body);
+  }
 
-// Tandai Dibaca
-static Future<void> markNotifAsRead(int id, int userId) async {
-  await http.patch(Uri.parse("$_notifUrl/notifications/$id/read?user_id=$userId"));
-}
+  // Tandai Dibaca
+  static Future<void> markNotifAsRead(int id, int userId) async {
+    await http.patch(Uri.parse("$_notifUrl/notifications/$id/read?user_id=$userId"));
+  }
 
-// Hapus Notifikasi
-static Future<Map<String, dynamic>> deleteNotification(int id, int userId) async {
-  final response = await http.delete(Uri.parse("$_notifUrl/notifications/$id?user_id=$userId"));
-  return jsonDecode(response.body);
-}
+  // Hapus Notifikasi
+  static Future<Map<String, dynamic>> deleteNotification(int id, int userId) async {
+    final response = await http.delete(Uri.parse("$_notifUrl/notifications/$id?user_id=$userId"));
+    return jsonDecode(response.body);
+  }
 
-// 22. Edit Ulasan Hotel
+  // Edit Ulasan Hotel
   static Future<Map<String, dynamic>> updateHotelReview(int id, Map<String, dynamic> data) async {
     final response = await http.put(
       Uri.parse("$_hotelUrl/review/hotel/$id"),
@@ -593,12 +591,12 @@ static Future<Map<String, dynamic>> deleteNotification(int id, int userId) async
     return jsonDecode(response.body);
   }
 
-  // 23. Hapus Ulasan Hotel
+  // Hapus Ulasan Hotel
   static Future<Map<String, dynamic>> deleteHotelReview(int id, int userId) async {
     final response = await http.delete(
       Uri.parse("$_hotelUrl/review/hotel/$id?user_id=$userId"),
     );
     return jsonDecode(response.body);
   }
-
+  
 }

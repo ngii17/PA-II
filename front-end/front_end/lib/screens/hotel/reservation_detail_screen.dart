@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
+import '../../providers/event_provider.dart';
 import '../event/event_header.dart';
 
 class ReservationDetailScreen extends StatefulWidget {
@@ -21,7 +23,6 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
     _currentRes = widget.reservation;
   }
 
-  // --- 1. REFRESH DATA AGAR TOMBOL UPDATE ---
   void _triggerRefresh() {
     ApiServices.getReservationHistory(_currentRes['user_id'].toString()).then((value) {
       if (value['success'] == true && mounted) {
@@ -36,13 +37,7 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
     });
   }
 
-  // --- 2. DIALOG ULASAN (PERSIS SEPERTI RESTORAN) ---
   void _showReviewDialog(BuildContext context, {bool isEdit = false, int? reviewId, Map<String, dynamic>? existingData}) {
-    
-    // DEBUG: Cek apakah data ulasan lama benar-benar sampai ke sini
-    print("DEBUG_EXISTING_DATA: $existingData");
-
-    // Gunakan pengecekan manual untuk mengisi text
     final TextEditingController commentController = TextEditingController();
     if (isEdit && existingData != null) {
       commentController.text = existingData['komentar'] ?? "";
@@ -51,14 +46,15 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
     int selectedRating = isEdit ? (existingData?['rating'] ?? 5) : 5;
     bool isAnonymous = isEdit ? (existingData?['is_anonymous'] ?? false) : false;
     bool isSending = false;
-    final primaryColor = Theme.of(context).primaryColor;
+    final eventProvider = Provider.of<EventProvider>(context, listen: false);
+    final primaryColor = eventProvider.primaryColor;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(isEdit ? "Edit Ulasan Kamar" : "Beri Ulasan Kamar"),
           content: SingleChildScrollView(
             child: Column(
@@ -66,7 +62,6 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
               children: [
                 const Text("Bagaimana pengalaman menginap Anda?", textAlign: TextAlign.center),
                 const SizedBox(height: 15),
-                // Bintang Rating
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
@@ -79,14 +74,13 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
                     );
                   }),
                 ),
-                // Input Komentar
                 TextField(
                   controller: commentController,
                   maxLines: 3,
                   enabled: !isSending,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: "Tulis komentar...", 
-                    border: OutlineInputBorder()
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -103,6 +97,7 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
           actions: [
             TextButton(onPressed: isSending ? null : () => Navigator.pop(context), child: const Text("Batal")),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
               onPressed: isSending ? null : () async {
                 if (commentController.text.trim().length < 5) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Komentar minimal 5 huruf")));
@@ -114,7 +109,7 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
 
                 Map<String, dynamic> data = {
                   "user_id": userId,
-                  "tipe_kamar_id": _currentRes['tipe_kamar_id'], 
+                  "tipe_kamar_id": _currentRes['tipe_kamar_id'],
                   "reservasi_id": _currentRes['id'],
                   "rating": selectedRating,
                   "komentar": commentController.text,
@@ -144,14 +139,14 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
     );
   }
 
-  // --- 3. KONFIRMASI HAPUS ---
   void _confirmDeleteReview(int? reviewId) {
     if (reviewId == null) return;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Hapus Ulasan?"),
-        content: const Text("Ulasan Anda akan dihapus secara permanen dari riwayat hotel."),
+        content: const Text("Ulasan Anda akan dihapus secara permanen."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
           TextButton(
@@ -172,24 +167,19 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
     );
   }
 
-  // --- 4. WIDGET TOMBOL (SINKRON DENGAN LOGIKA RESTORAN) ---
   Widget _buildReviewButton(int statusId, bool isReviewed, Color primaryColor) {
     if (isReviewed) {
       return Row(
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () => _showReviewDialog(
-                context, 
-                isEdit: true, 
-                reviewId: _currentRes['review_id'], 
-                existingData: _currentRes['existing_review']
-              ),
+              onPressed: () => _showReviewDialog(context, isEdit: true, reviewId: _currentRes['review_id'], existingData: _currentRes['existing_review']),
               icon: const Icon(Icons.edit_note),
               label: const Text("EDIT ULASAN"),
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.blue, 
-                side: const BorderSide(color: Colors.blue)
+                foregroundColor: Colors.blue,
+                side: const BorderSide(color: Colors.blue),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
@@ -202,7 +192,6 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
       );
     }
 
-    // Hanya aktif jika status sudah SELESAI (4)
     bool canClick = statusId == 4;
     return SizedBox(
       width: double.infinity,
@@ -213,6 +202,7 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: canClick ? primaryColor : Colors.grey[400],
           padding: const EdgeInsets.all(15),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );
@@ -220,13 +210,30 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
-    int statusId = int.parse(_currentRes['status_reservasi_id']?.toString() ?? "1");
-    bool isReviewed = _currentRes['is_reviewed'] == true;
+    final eventProvider = context.watch<EventProvider>();
+    final primaryColor = eventProvider.primaryColor;
+    final statusId = int.tryParse(_currentRes['status_reservasi_id'].toString()) ?? 1;
+    final isReviewed = _currentRes['is_reviewed'] == true;
 
-    // ... (Bagian build UI lainnya seperti Box Status dan Info Tamu tetap sama) ...
+    String statusText;
+    Color statusColor;
+    switch (statusId) {
+      case 1: statusText = "PENDING"; statusColor = Colors.orange; break;
+      case 2: statusText = "TERBAYAR"; statusColor = Colors.blue; break;
+      case 3: statusText = "SUDAH CHECK-IN"; statusColor = Colors.green; break;
+      case 4: statusText = "SELESAI"; statusColor = Colors.grey; break;
+      case 5: statusText = "DIBATALKAN"; statusColor = Colors.red; break;
+      default: statusText = "UNKNOWN"; statusColor = Colors.black;
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Detail Reservasi"), backgroundColor: primaryColor, foregroundColor: Colors.white),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Detail Reservasi"),
+        backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -236,25 +243,40 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Box Status (Gunakan _currentRes agar reaktif)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
                     child: Column(
                       children: [
-                        Text(_currentRes['nama_tipe'] ?? "Kamar", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 5),
-                        Text(statusId == 4 ? "SELESAI" : "AKTIF", style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        Text(
+                          _currentRes['nama_tipe'] ?? "Kamar",
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: statusColor),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 30),
-                  _itemRow("Check-in", _currentRes['tgl_checkin']),
-                  _itemRow("Total Bayar", "Rp ${double.parse(_currentRes['total_harga'].toString()).toStringAsFixed(0)}", isBold: true, textColor: primaryColor),
-                  const Divider(height: 50),
-                  
-                  // PANGGIL TOMBOL DINAMIS
+                  _infoRow("Check-in", _currentRes['tgl_checkin']),
+                  _infoRow("Total Bayar", "Rp ${double.parse(_currentRes['total_harga'].toString()).toStringAsFixed(0)}", isBold: true, textColor: primaryColor),
+                  const SizedBox(height: 30),
                   _buildReviewButton(statusId, isReviewed, primaryColor),
                 ],
               ),
@@ -265,14 +287,14 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
     );
   }
 
-  Widget _itemRow(String label, String value, {bool isBold = false, Color? textColor}) {
+  Widget _infoRow(String label, String value, {bool isBold = false, Color? textColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: textColor)),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: textColor, fontSize: 14)),
         ],
       ),
     );

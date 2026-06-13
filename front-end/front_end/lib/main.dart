@@ -2,20 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Tambahkan ini
+import 'package:shared_preferences/shared_preferences.dart';
 
-// --- IMPORT PROVIDERS ---
 import 'providers/event_provider.dart';
 import 'providers/cart_provider.dart';
-
-// --- IMPORT SERVICES & THEME ---
 import 'notification/notification_service.dart';
 import 'screens/event/app_theme.dart';
+import 'screens/user/premium_splash_screen.dart';
 import 'screens/user/login_screen.dart';
-import 'screens/home/home_screen.dart'; // Pastikan path home_screen benar
+import 'screens/home/home_screen.dart';
 import 'screens/notification/notification_screen.dart';
 
-// 1. GLOBAL NAVIGATOR KEY
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
@@ -24,10 +21,10 @@ void main() async {
   try {
     await Firebase.initializeApp();
     await PushNotificationService.initialize();
-    setupNotificationInteractions();
-    print("LOG_NOTIFICATION: Firebase & Interaction Handler Berhasil");
+    _setupNotificationInteractions();
+    debugPrint("LOG_SYSTEM: Firebase & Notification System Ready");
   } catch (e) {
-    print("LOG_ERROR: Gagal inisialisasi Firebase: $e");
+    debugPrint("LOG_ERROR: Gagal inisialisasi Firebase: $e");
   }
 
   runApp(
@@ -41,7 +38,7 @@ void main() async {
   );
 }
 
-void setupNotificationInteractions() async {
+void _setupNotificationInteractions() async {
   RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   if (initialMessage != null) {
     _navigateToNotificationScreen();
@@ -60,89 +57,66 @@ void _navigateToNotificationScreen() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // Fungsi untuk memperbarui waktu aktivitas terakhir ke SharedPreferences
-  void _updateLastActivity() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    // Simpan timestamp milidetik saat ini
-    await prefs.setInt('last_activity', DateTime.now().millisecondsSinceEpoch);
-  }
-
   @override
   Widget build(BuildContext context) {
     final eventProvider = context.watch<EventProvider>();
-
-    return Listener(
-      // --- PELACAK AKTIVITAS OTOMATIS ---
-      // Setiap kali ada sentuhan di layar manapun, waktu aktivitas diperbarui
-      onPointerDown: (_) => _updateLastActivity(),
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
-        title: 'Purnama Hotel & Resto',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.getTheme(eventProvider.activeTheme),
-        home: const SplashScreenProxy(),
-      ),
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: 'Purnama',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.getTheme(eventProvider.activeTheme),
+      home: const SplashScreenWrapper(),
     );
   }
 }
 
-class SplashScreenProxy extends StatefulWidget {
-  const SplashScreenProxy({super.key});
+class SplashScreenWrapper extends StatefulWidget {
+  const SplashScreenWrapper({super.key});
 
   @override
-  State<SplashScreenProxy> createState() => _SplashScreenProxyState();
+  State<SplashScreenWrapper> createState() => _SplashScreenWrapperState();
 }
 
-class _SplashScreenProxyState extends State<SplashScreenProxy> {
+class _SplashScreenWrapperState extends State<SplashScreenWrapper> {
   @override
   void initState() {
     super.initState();
-    
-    // 1. Ambil tema dari database
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<EventProvider>().fetchActiveTheme();
       }
     });
-    
-    // 2. Cek Sesi User
-    _checkSession();
   }
 
-  void _checkSession() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    
-    // Ambil Token dan Waktu Aktivitas Terakhir
-    String? token = prefs.getString('access_token');
-    int? lastActivity = prefs.getInt('last_activity');
+  void _handleSplashFinished() {
+    _checkSessionAndNavigate();
+  }
 
-    // Beri jeda 2 detik untuk Splash Screen
-    await Future.delayed(const Duration(seconds: 2));
+  void _checkSessionAndNavigate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    final lastActivity = prefs.getInt('last_activity');
 
+    // Jika tidak ada token (guest), langsung ke home
     if (token == null) {
-      // Jika belum login sama sekali
-      _goToLogin();
+      _goToHome(); // <-- PERUBAHAN UTAMA
       return;
     }
 
+    // Cek session timeout (30 menit)
     if (lastActivity != null) {
-      int now = DateTime.now().millisecondsSinceEpoch;
-      int difference = now - lastActivity;
-      
-      // 30 Menit = 30 * 60 * 1000 milidetik = 1.800.000
-      const int timeoutLimit = 30 * 60 * 1000;
-
-      if (difference > timeoutLimit) {
-        // --- SESI HABIS ---
-        print("LOG_SESSION: Sesi Kadaluwarsa. Menghapus data login...");
-        await prefs.clear(); // Hapus token agar harus login ulang
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final diff = now - lastActivity;
+      const timeout = 30 * 60 * 1000; // 30 menit
+      if (diff > timeout) {
+        debugPrint("LOG_SESSION: Sesi kadaluwarsa. Hapus token.");
+        await prefs.clear();
         _goToLogin();
         return;
       }
     }
 
-    // --- SESI MASIH BERLAKU ---
-    // Update waktu aktivitas sekarang agar 10 menit mulai dihitung dari saat ini
+    // Session masih valid, update last_activity dan lanjut ke home
     await prefs.setInt('last_activity', DateTime.now().millisecondsSinceEpoch);
     _goToHome();
   }
@@ -151,7 +125,7 @@ class _SplashScreenProxyState extends State<SplashScreenProxy> {
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     }
   }
@@ -160,17 +134,15 @@ class _SplashScreenProxyState extends State<SplashScreenProxy> {
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
+    return PremiumSplashScreen(
+      onFinished: _handleSplashFinished,
     );
   }
 }

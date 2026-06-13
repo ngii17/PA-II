@@ -23,7 +23,6 @@ class PushNotificationService {
       iOS: iosSettings,
     );
 
-    // --- PERBAIKAN: Menggunakan label 'settings' sesuai permintaan VS Code kamu ---
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
@@ -59,7 +58,6 @@ class PushNotificationService {
       android: androidDetail,
     );
 
-    // --- PERBAIKAN: Menggunakan label lengkap agar tidak error 'positional arguments' ---
     _localNotifications.show(
       DateTime.now().millisecond,
       message.notification?.title ?? "Purnama Hotel",
