@@ -8,7 +8,7 @@ use App\Http\Controllers\Dashboard\PembayaranController;
 use App\Http\Controllers\Dashboard\LaporanController;
 use App\Http\Controllers\Dashboard\PromoController;
 use App\Http\Controllers\Dashboard\UlasanController;
-use App\Http\Controllers\Dashboard\EventController; // Controller Event yang sudah dipindah ke Admin
+use App\Http\Controllers\Dashboard\EventController;
 use App\Http\Controllers\Dashboard\Hotel\KamarController;
 use App\Http\Controllers\Dashboard\Hotel\TipeKamarController;
 use App\Http\Controllers\Dashboard\Hotel\ReservasiHotelController;
@@ -18,11 +18,11 @@ use App\Http\Controllers\Dashboard\Restoran\MenuController;
 use App\Http\Controllers\Dashboard\Restoran\KategoriMenuController;
 use App\Http\Controllers\Dashboard\Restoran\PesananController;
 use App\Http\Controllers\Dashboard\Restoran\StokMenuController;
-use App\Http\Controllers\Dashboard\Restoran\EventRestoranController;
 use App\Http\Controllers\Dashboard\Restoran\MenuEventController;
 use App\Http\Controllers\Dashboard\Restoran\PembayaranRestoController;
 use App\Http\Controllers\Dashboard\Restoran\UlasanRestoranController;
 use App\Http\Controllers\Dashboard\AdminBroadcastController;
+use App\Http\Controllers\Dashboard\ProfileController;
 
 
 /*
@@ -66,8 +66,7 @@ Route::middleware(['dashboard'])->prefix('dashboard')->group(function () {
     
     // --- MODERASI ULASAN GLOBAL ---
     Route::get('/ulasan', [UlasanController::class, 'index'])->name('dashboard.ulasan');
-    Route::patch('/ulasan/{id}/toggle', [UlasanController::class, 'toggle'])->name('dashboard.ulasan.toggle');
-    
+    Route::patch('/ulasan/{tipe}/{id}/toggle', [UlasanController::class, 'toggle'])->name('dashboard.ulasan.toggle');           
     // --- MANAJEMEN PROMO ---
     Route::resource('promo', PromoController::class)->names('dashboard.promo');
 
@@ -81,8 +80,11 @@ Route::middleware(['dashboard'])->prefix('dashboard')->group(function () {
     // 🏨 STAFF HOTEL (OPERASIONAL HOTEL)
     // ============================================================
     Route::prefix('hotel')->group(function () {
-        // AJAX: Filter nomor kamar berdasarkan tipe yang dipilih
-        Route::get('/get-available-rooms/{tipe_id}', [ReservasiHotelController::class, 'getAvailableRooms'])->name('dashboard.hotel.reservasi.getRooms');
+
+        // FIX: Parameter current_kamar_id ditambahkan sebagai opsional
+        // agar kamar yang sedang dipakai reservasi tetap muncul di dropdown
+        // meski status_kamar_id = 2 (Terisi)
+        Route::get('/get-available-rooms/{tipe_id}/{current_kamar_id?}', [ReservasiHotelController::class, 'getAvailableRooms'])->name('dashboard.hotel.reservasi.getRooms');
 
         Route::resource('tipe-kamar', TipeKamarController::class)->names('dashboard.hotel.tipe-kamar');
         Route::resource('kamar', KamarController::class)->names('dashboard.hotel.kamar');
@@ -91,7 +93,7 @@ Route::middleware(['dashboard'])->prefix('dashboard')->group(function () {
         Route::get('/pembayaran', [PembayaranHotelController::class, 'index'])->name('dashboard.hotel.pembayaran');
         
         Route::get('/ulasan', [UlasanHotelController::class, 'index'])->name('dashboard.hotel.ulasan');
-        Route::patch('/ulasan/{id}/toggle', [UlasanHotelController::class, 'toggle'])->name('dashboard.hotel.ulasan.toggle');
+        Route::patch('/ulasan/{id}/toggle', [UlasanController::class, 'toggle'])->name('dashboard.ulasan.hotel.toggle');
     });
 
 
@@ -114,7 +116,7 @@ Route::middleware(['dashboard'])->prefix('dashboard')->group(function () {
         // PEMBAYARAN & ULASAN RESTO
         Route::get('/pembayaran', [PembayaranRestoController::class, 'index'])->name('dashboard.restoran.pembayaran');
         Route::get('/ulasan', [UlasanRestoranController::class, 'index'])->name('dashboard.restoran.ulasan');
-        Route::patch('/ulasan/{id}/toggle', [UlasanRestoranController::class, 'toggle'])->name('dashboard.restoran.ulasan.toggle');
+        Route::patch('/ulasan/{tipe}/{id}/toggle', [UlasanController::class, 'toggle'])->name('dashboard.ulasan.restoran.toggle');
     });
 
     Route::prefix('admin')->group(function () {
@@ -124,4 +126,9 @@ Route::middleware(['dashboard'])->prefix('dashboard')->group(function () {
     Route::post('/broadcast/send/{id}', [AdminBroadcastController::class, 'send'])->name('dashboard.admin.broadcast.send');
     Route::delete('/broadcast/{id}', [AdminBroadcastController::class, 'destroy'])->name('dashboard.admin.broadcast.destroy');
     });
+
+    // ============================================================
+    // 👤 PROFIL PENGGUNA (SEMUA ROLE)
+    // ============================================================
+    Route::get('/profile', [ProfileController::class, 'show'])->name('dashboard.profile');
 });

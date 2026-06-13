@@ -11,98 +11,122 @@ class EventSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Bersihkan data lama dengan TRUNCATE CASCADE agar ID reset ke 1
-        // PENTING: Kita bersihkan tabel event_menu juga agar tidak ada relasi yatim piatu
+        // 1. Bersihkan data lama
         DB::statement('TRUNCATE TABLE event_menu RESTART IDENTITY CASCADE');
         DB::statement('TRUNCATE TABLE events RESTART IDENTITY CASCADE');
-        
-        // Hapus hanya promo yang memiliki kode_promo (Voucher manual)
-        // Kita biarkan promo otomatis (is_active saklar) yang dibuat di seeder sebelumnya
         Promo::whereNotNull('kode_promo')->delete();
 
-        // 2. DAFTAR 6 TEMA VISUAL (Sinkron dengan Flutter UI)
+        // 2. Daftar event sesuai permintaan
         $events = [
             [
-                'nama_event' => 'Tema Default',
+                'nama_event' => 'Purnama Hotel Luxury',
                 'event_code' => 'default',
-                'primary_color' => '#448AFF', // Hijau Standar Purnama
-                'secondary_color' => '#E3F2FD',
-                'header_image' => 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb',
-                'is_active' => true, // Tema awal yang aktif
+                'primary_color' => '#0A1D56',
+                'secondary_color' => '#D4AF37',
+                'header_image' => 'https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2000&auto=format&fit=crop',
+                'is_active' => true,
             ],
             [
                 'nama_event' => 'Tahun Baru Imlek',
                 'event_code' => 'imlek',
-                'primary_color' => '#D32F2F', // Merah Imlek
-                'secondary_color' => '#FFC107',
-                'header_image' => 'https://images.unsplash.com/photo-1563245372-f21724e3856d',
+                'primary_color' => '#C62828',
+                'secondary_color' => '#FFD54F',
+                'header_image' => 'https://images.unsplash.com/photo-1549692520-acc6669e2f0c?q=80&w=2000&auto=format&fit=crop',
                 'is_active' => false,
             ],
             [
                 'nama_event' => 'Natal & Tahun Baru',
                 'event_code' => 'natal',
-                'primary_color' => '#2E7D32', // Hijau Pinus
-                'secondary_color' => '#C62828',
-                'header_image' => 'https://images.unsplash.com/photo-1543589077-47d81606c1bf',
+                'primary_color' => '#1B5E20',
+                'secondary_color' => '#D32F2F',
+                'header_image' => 'https://images.unsplash.com/photo-1512389142860-9c449e58a543?q=80&w=2000&auto=format&fit=crop',
                 'is_active' => false,
             ],
             [
                 'nama_event' => 'Hari Raya Idul Fitri',
                 'event_code' => 'lebaran',
-                'primary_color' => '#1B5E20', // Hijau Tua
-                'secondary_color' => '#FDD835', // Kuning Emas
-                'header_image' => 'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f',
+                'primary_color' => '#00695C',
+                'secondary_color' => '#FFD700',
+                'header_image' => 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?q=80&w=2000&auto=format&fit=crop',
                 'is_active' => false,
             ],
             [
                 'nama_event' => 'Hari Valentine',
                 'event_code' => 'valentine',
-                'primary_color' => '#EC407A', // Pink
-                'secondary_color' => '#F48FB1',
-                'header_image' => 'https://images.unsplash.com/photo-1518199266791-739949406b24',
+                'primary_color' => '#E91E63',
+                'secondary_color' => '#F8BBD0',
+                'header_image' => 'https://images.unsplash.com/photo-1518621012118-696072aa579a?q=80&w=2000&auto=format&fit=crop',
                 'is_active' => false,
             ],
             [
                 'nama_event' => 'HUT Republik Indonesia',
                 'event_code' => 'hut_ri',
-                'primary_color' => '#FF0000', // Merah Bendera
-                'secondary_color' => '#FFFFFF', // Putih
-                'header_image' => 'https://images.unsplash.com/photo-1593118247619-e2d6f056869e',
+                'primary_color' => '#D50000',
+                'secondary_color' => '#FFFFFF',
+                'header_image' => 'https://images.unsplash.com/photo-1521295121783-8a321d551ad2?q=80&w=2000&auto=format&fit=crop',
+                'is_active' => false,
+            ],
+            [
+                'nama_event' => 'Summer Holiday',
+                'event_code' => 'summer',
+                'primary_color' => '#0288D1',
+                'secondary_color' => '#FFCA28',
+                'header_image' => 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=2000&auto=format&fit=crop',
+                'is_active' => false,
+            ],
+            [
+                'nama_event' => 'Romantic Escape',
+                'event_code' => 'romantic',
+                'primary_color' => '#AD1457',
+                'secondary_color' => '#F8BBD0',
+                'header_image' => 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=2000&auto=format&fit=crop',
+                'is_active' => false,
+            ],
+            [
+                'nama_event' => 'Halloween Night',
+                'event_code' => 'halloween',
+                'primary_color' => '#EF6C00',
+                'secondary_color' => '#212121',
+                'header_image' => 'https://images.unsplash.com/photo-1509557965875-b88c97052f0e?q=80&w=2000&auto=format&fit=crop',
+                'is_active' => false,
+            ],
+            [
+                'nama_event' => 'Anniversary Celebration',
+                'event_code' => 'anniversary',
+                'primary_color' => '#6A1B9A',
+                'secondary_color' => '#FFD700',
+                'header_image' => 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=2000&auto=format&fit=crop',
                 'is_active' => false,
             ],
         ];
 
         foreach ($events as $item) {
-            // Tambahkan formatting unsplash agar gambar pas di header HP
-            $item['header_image'] .= '?q=80&w=2000&auto=format&fit=crop';
             Event::create($item);
         }
 
-        // 3. DAFTAR PROMO VOUCHER (Manual Input untuk Tes di Flutter)
-        // Voucher khusus Restoran
+        // 3. Promo voucher (opsional)
         Promo::create([
             'nama_promo'       => 'Voucher Makan Hemat',
-            'kode_promo'       => 'MAKANPUAS', 
+            'kode_promo'       => 'MAKANPUAS',
             'kategori'         => 'restoran',
             'tipe_diskon'      => 'nominal',
-            'nominal_potongan' => 10000, 
+            'nominal_potongan' => 10000,
             'tgl_mulai'        => now(),
             'tgl_selesai'      => now()->addDays(30),
-            'is_active'        => true, // Pastikan AKTIF agar bisa dipakai
+            'is_active'        => true,
         ]);
 
-        // Voucher khusus Hotel
         Promo::create([
             'nama_promo'       => 'Staycation Asik',
-            'kode_promo'       => 'HOTELMURAH', 
+            'kode_promo'       => 'HOTELMURAH',
             'kategori'         => 'hotel',
             'tipe_diskon'      => 'persen',
-            'nominal_potongan' => 20, 
+            'nominal_potongan' => 20,
             'tgl_mulai'        => now(),
             'tgl_selesai'      => now()->addDays(30),
-            'is_active'        => true, // Pastikan AKTIF
+            'is_active'        => true,
         ]);
 
-        $this->command->info('EventSeeder: 6 Tema Berhasil Dibuat & Voucher MAKANPUAS, HOTELMURAH siap digunakan!');
+        $this->command->info('EventSeeder: 10 tema berhasil ditambahkan (default aktif), dan voucher promo siap digunakan!');
     }
 }

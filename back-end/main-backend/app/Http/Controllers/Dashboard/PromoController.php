@@ -160,4 +160,26 @@ class PromoController extends Controller
 
         return redirect()->back()->with('success', "Status promo berhasil diubah.");
     }
+
+    /**
+ * 8. API — LIST SEMUA PROMO AKTIF (untuk Flutter)
+ */
+public function activeForApi()
+{
+    $promos = Promo::where('is_active', true)
+        ->where('tgl_mulai',    '<=', now())
+        ->where('tgl_selesai',  '>=', now())
+        ->orderBy('created_at', 'desc')
+        ->get([
+            'id', 'nama_promo', 'kode_promo', 'kategori',
+            'tipe_diskon', 'nominal_potongan',
+            'tgl_mulai', 'tgl_selesai',
+        ]);
+
+    return response()->json([
+        'success' => true,
+        'data'    => $promos,
+    ]);
+}
+    
 }

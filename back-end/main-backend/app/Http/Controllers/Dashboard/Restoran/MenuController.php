@@ -30,6 +30,7 @@ class MenuController extends Controller
     // 2. SIMPAN MENU (FIX: Validasi & Status Otomatis)
     public function store(Request $request)
     {
+        
         // Validasi diperketat
         $request->validate([
             'nama_menu'        => 'required|string|max:255',
@@ -53,8 +54,9 @@ class MenuController extends Controller
             if ($request->hasFile('foto_menu')) {
                 $file = $request->file('foto_menu');
                 $filename = time() . '_' . str_replace(' ', '_', $request->nama_menu) . '.' . $file->getClientOriginalExtension();
+                
                 $file->storeAs('public/menu', $filename);
-                $data['foto_menu'] = url('storage/menu/' . $filename); 
+                $data['foto_menu'] = 'menu/' . $filename; // simpan path saja
             }
 
             Menu::create($data);
@@ -100,15 +102,14 @@ class MenuController extends Controller
             // --- UPDATE FOTO JIKA ADA FILE BARU ---
             if ($request->hasFile('foto_menu')) {
                 // Hapus foto lama jika bukan URL internet
-                if ($menu->foto_menu && str_contains($menu->foto_menu, 'storage/menu')) {
-                    $oldPath = str_replace(url('storage'), 'public', $menu->foto_menu);
-                    Storage::delete($oldPath);
+                if ($menu->foto_menu) {
+                Storage::delete('public/' . $menu->foto_menu);
                 }
 
                 $file = $request->file('foto_menu');
                 $filename = time() . '_' . str_replace(' ', '_', $request->nama_menu) . '.' . $file->getClientOriginalExtension();
                 $file->storeAs('public/menu', $filename);
-                $data['foto_menu'] = url('storage/menu/' . $filename);
+                $data['foto_menu'] = 'menu/' . $filename;
             }
 
             $menu->update($data);

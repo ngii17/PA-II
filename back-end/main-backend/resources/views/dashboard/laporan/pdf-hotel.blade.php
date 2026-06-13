@@ -1,81 +1,334 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
     <meta charset="utf-8">
-    <title>Laporan Reservasi Hotel</title>
+    <title>Laporan Reservasi Hotel — Purnama Hotel & Resto</title>
     <style>
+        /* ============================================================
+           RESET & BASE (Kompatibel DOMPDF)
+           ============================================================ */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: sans-serif; font-size: 11px; color: #333; padding: 20px; line-height: 1.4; }
-        .header { background: #1a1a2e; color: white; padding: 16px 20px; border-radius: 8px; margin-bottom: 16px; }
-        .header .hotel-name { font-size: 18px; font-weight: bold; }
+        body {
+            font-family: 'DejaVu Sans', 'sans-serif';
+            font-size: 10px;
+            color: #1e293b;
+            background: #fff;
+            padding: 28px 32px;
+            line-height: 1.5;
+        }
 
-        .summary-table { width: 100%; margin-bottom: 16px; border-collapse: separate; border-spacing: 8px 0; }
-        .summary-box { width: 33.33%; padding: 12px; border-radius: 6px; text-align: center; }
-        .blue { background: #EEF2FF; border-left: 4px solid #0d6efd; color: #0d6efd; }
-        .green { background: #ECFDF5; border-left: 4px solid #198754; color: #198754; }
-        .gold { background: #FFFBEB; border-left: 4px solid #f59e0b; color: #d97706; }
-        .label { font-size: 10px; text-transform: uppercase; margin-bottom: 4px; }
-        .value { font-size: 15px; font-weight: bold; }
+        /* ============================================================
+           HEADER
+           ============================================================ */
+        .doc-header {
+            background: #000C3D;
+            border-radius: 10px;
+            padding: 22px 28px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .doc-header::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 180px; height: 100%;
+            background: linear-gradient(135deg, transparent 40%, rgba(212,175,55,.12) 100%);
+        }
+        .doc-header-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .brand-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffffff;
+            letter-spacing: -.3px;
+            margin-bottom: 3px;
+        }
+        .brand-tagline {
+            font-size: 9px;
+            color: rgba(255,255,255,.55);
+            text-transform: uppercase;
+            letter-spacing: 1.8px;
+            font-weight: bold;
+        }
+        .doc-meta {
+            text-align: right;
+        }
+        .doc-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #D4AF37;
+            margin-bottom: 4px;
+        }
+        .doc-date {
+            font-size: 9px;
+            color: rgba(255,255,255,.5);
+        }
+        .gold-bar {
+            height: 3px;
+            background: linear-gradient(90deg, #D4AF37 0%, #e8c84a 50%, transparent 100%);
+            border-radius: 0 0 3px 3px;
+            margin-top: 14px;
+        }
 
-        .section-title { font-size: 12px; font-weight: bold; color: #1a1a2e; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 2px solid #1a1a2e; }
-        table { width: 100%; border-collapse: collapse; }
-        thead tr { background: #1a1a2e; color: white; }
-        th { padding: 8px; text-align: left; border: 1px solid #1a1a2e; }
-        td { padding: 7px; border: 1px solid #e5e7eb; }
-        .badge { padding: 2px 8px; border-radius: 10px; font-size: 9px; font-weight: bold; color: white; }
-        .bg-success { background: #198754; }
-        .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #999; }
+        /* ============================================================
+           SUMMARY CARDS
+           ============================================================ */
+        .summary-row {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px 0;
+            margin-bottom: 20px;
+        }
+        .summary-cell {
+            width: 33.33%;
+            padding: 14px 16px;
+            border-radius: 8px;
+            vertical-align: top;
+        }
+        .sc-blue   { background: #EEF2FF; border-left: 4px solid #1D4ED8; }
+        .sc-green  { background: #ECFDF5; border-left: 4px solid #15803D; }
+        .sc-gold   { background: #FFFBEB; border-left: 4px solid #D4AF37; }
+
+        .s-label {
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .sc-blue  .s-label  { color: #1D4ED8; }
+        .sc-green .s-label  { color: #15803D; }
+        .sc-gold  .s-label  { color: #B45309; }
+
+        .s-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #0f172a;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+        .s-sub {
+            font-size: 8px;
+            color: #94a3b8;
+        }
+
+        /* ============================================================
+           SECTION TITLE
+           ============================================================ */
+        .section-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #000C3D;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #00197D;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #D4AF37;
+            flex-shrink: 0;
+        }
+
+        /* ============================================================
+           DATA TABLE
+           ============================================================ */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .data-table thead tr {
+            background: #00197D;
+        }
+        .data-table thead th {
+            padding: 9px 11px;
+            text-align: left;
+            font-size: 8.5px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            font-weight: bold;
+            color: rgba(255,255,255,.85);
+            border: none;
+        }
+        .data-table tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+        .data-table tbody tr:nth-child(odd) {
+            background: #ffffff;
+        }
+        .data-table tbody td {
+            padding: 8px 11px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 9.5px;
+            color: #334155;
+            vertical-align: middle;
+        }
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .td-num {
+            color: #94a3b8;
+            font-weight: bold;
+            text-align: center;
+        }
+        .td-bold { font-weight: bold; color: #0f172a; }
+        .td-money { font-weight: bold; color: #00197D; }
+        .td-center { text-align: center; }
+
+        /* ============================================================
+           BADGE
+           ============================================================ */
+        .badge {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 99px;
+            font-size: 8px;
+            font-weight: bold;
+        }
+        .badge-success { background: #dcfce7; color: #065f46; }
+        .badge-warn    { background: #fef9c3; color: #854d0e; }
+        .badge-info    { background: #dbeafe; color: #1e40af; }
+        .badge-danger  { background: #fee2e2; color: #991b1b; }
+
+        /* ============================================================
+           FOOTER
+           ============================================================ */
+        .doc-footer {
+            margin-top: 28px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .footer-left {
+            font-size: 8px;
+            color: #94a3b8;
+        }
+        .footer-brand {
+            font-size: 8px;
+            font-weight: bold;
+            color: #00197D;
+        }
+        .footer-right {
+            font-size: 8px;
+            color: #94a3b8;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="hotel-name">Purnama Hotel & Resto</div>
-        <div class="subtitle">Laporan Reservasi Hotel</div>
-        <div class="print-date">Dicetak: {{ now()->format('d M Y, H:i') }} WIB</div>
+
+    <!-- HEADER -->
+    <div class="doc-header">
+        <div class="doc-header-inner">
+            <div>
+                <div class="brand-name">Purnama Hotel &amp; Resto</div>
+                <div class="brand-tagline">Laporan Manajemen Internal</div>
+            </div>
+            <div class="doc-meta">
+                <div class="doc-title">Laporan Reservasi Hotel</div>
+                <div class="doc-date">Dicetak: {{ now()->format('d F Y, H:i') }} WIB</div>
+            </div>
+        </div>
+        <div class="gold-bar"></div>
     </div>
 
-    <table class="summary-table">
+    <!-- SUMMARY CARDS -->
+    <table class="summary-row">
         <tr>
-            <td class="summary-box blue">
-                <div class="label">Total Reservasi</div>
-                <div class="value">{{ $reservasi->count() }}</div>
+            <td class="summary-cell sc-blue">
+                <div class="s-label">Total Reservasi</div>
+                <div class="s-value">{{ $reservasi->count() }}</div>
+                <div class="s-sub">Semua status</div>
             </td>
-            <td class="summary-box green">
-                <div class="label">Telah Dibayar</div>
-                <div class="value">{{ $terbayarCount }}</div>
+            <td class="summary-cell sc-green">
+                <div class="s-label">Telah Dibayar</div>
+                <div class="s-value">{{ $terbayarCount }}</div>
+                <div class="s-sub">Transaksi sukses</div>
             </td>
-            <td class="summary-box gold">
-                <div class="label">Total Pendapatan</div>
-                <div class="value">Rp {{ number_format($totalPendapatan, 0, ',', '.') }}</div>
+            <td class="summary-cell sc-gold">
+                <div class="s-label">Total Pendapatan</div>
+                <div class="s-value" style="font-size:13px;">Rp {{ number_format($totalPendapatan, 0, ',', '.') }}</div>
+                <div class="s-sub">Akumulasi lunas</div>
             </td>
         </tr>
     </table>
 
-    <div class="section-title">Data Reservasi</div>
-    <table>
+    <!-- DATA TABLE -->
+    <div class="section-title">
+        <span class="section-dot"></span> Data Reservasi Hotel
+    </div>
+
+    <table class="data-table">
         <thead>
             <tr>
-                <th>#</th>
+                <th style="width:28px;" class="td-center">#</th>
                 <th>Tipe Kamar</th>
                 <th>Check In</th>
                 <th>Check Out</th>
-                <th>Total</th>
-                <th>Status</th>
+                <th>Durasi</th>
+                <th>Total Harga</th>
+                <th class="td-center">Status</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($reservasi as $i => $r)
+            @forelse($reservasi as $i => $r)
+            @php
+                $checkin  = \Carbon\Carbon::parse($r->tgl_checkin);
+                $checkout = \Carbon\Carbon::parse($r->tgl_checkout);
+                $durasi   = $checkin->diffInDays($checkout);
+                $status   = strtolower($r->statusReservasi->nama_status ?? 'selesai');
+                $badgeClass = match($status) {
+                    'lunas', 'terbayar', 'selesai', 'check-in' => 'badge-success',
+                    'pending'                       => 'badge-warn',
+                    'batal', 'dibatalkan'           => 'badge-danger',
+                    default                         => 'badge-info',
+                };
+            @endphp
             <tr>
-                <td>{{ $i + 1 }}</td>
-                <td>{{ $r->tipeKamar->nama_tipe ?? '-' }}</td>
-                <td>{{ \Carbon\Carbon::parse($r->tgl_checkin)->format('d/m/Y') }}</td>
-                <td>{{ \Carbon\Carbon::parse($r->tgl_checkout)->format('d/m/Y') }}</td>
-                <td style="font-weight: bold;">Rp {{ number_format($r->total_harga, 0, ',', '.') }}</td>
-                <td><span class="badge bg-success">{{ $r->statusReservasi->nama_status ?? 'Selesai' }}</span></td>
+                <td class="td-num">{{ $i + 1 }}</td>
+                <td class="td-bold">{{ $r->tipeKamar->nama_tipe ?? '-' }}</td>
+                <td>{{ $checkin->format('d M Y') }}</td>
+                <td>{{ $checkout->format('d M Y') }}</td>
+                <td class="td-center">{{ $durasi }} malam</td>
+                <td class="td-money">Rp {{ number_format($r->total_harga, 0, ',', '.') }}</td>
+                <td class="td-center">
+                    <span class="badge {{ $badgeClass }}">
+                        {{ $r->statusReservasi->nama_status ?? 'Selesai' }}
+                    </span>
+                </td>
             </tr>
-            @endforeach
+            @empty
+            <tr>
+                <td colspan="7" style="text-align:center;padding:20px;color:#94a3b8;">
+                    Tidak ada data reservasi.
+                </td>
+            </tr>
+            @endforelse
         </tbody>
     </table>
-    <div class="footer text-center">Dokumen otomatis sistem &bull; {{ date('Y') }}</div>
+
+    <!-- FOOTER -->
+    <div class="doc-footer">
+        <div class="footer-left">
+            <span class="footer-brand">Purnama Hotel &amp; Resto</span><br>
+            Dokumen ini digenerate otomatis oleh sistem manajemen.
+        </div>
+        <div class="footer-right">
+            Halaman 1 &bull; {{ now()->format('Y') }}
+        </div>
+    </div>
+
 </body>
 </html>

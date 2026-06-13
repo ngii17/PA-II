@@ -43,12 +43,20 @@ class UlasanController extends Controller
         ));
     }
 
-    public function toggle($id)
+        public function toggle($tipe, $id)
     {
-        // Mencari di hotel dulu, jika tidak ada cari di restoran
-        $u = UlasanHotel::find($id) ?? UlasanRestoran::findOrFail($id);
+        if ($tipe === 'hotel') {
+            $u = UlasanHotel::findOrFail($id);
+        } elseif ($tipe === 'restoran') {
+            $u = UlasanRestoran::findOrFail($id);
+        } else {
+            abort(404);
+        }
+
         $u->update(['is_hidden' => !$u->is_hidden]);
 
-        return redirect()->back()->with('success', 'Status visibilitas ulasan berhasil diubah.');
-    }
+       return redirect()->back()
+        ->with('success', 'Status visibilitas ulasan berhasil diubah.')
+        ->withFragment($tipe === 'hotel' ? 'hotel' : 'resto');
+        }
 }

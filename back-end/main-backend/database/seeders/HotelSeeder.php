@@ -38,42 +38,47 @@ class HotelSeeder extends Seeder
 
         // 4. Isi 5 Tipe Kamar (Realistis)
         $roomTypes = [
-            [
-                'nama_tipe' => 'Standard Room',
-                'harga' => 350000,
-                'kapasitas' => 2,
-                'fasilitas' => 'Single Bed, AC, TV, WiFi, Shower',
-                'deskripsi' => 'Pilihan ekonomis untuk kenyamanan istirahat Anda.'
-            ],
-            [
-                'nama_tipe' => 'Superior Room',
-                'harga' => 550000,
-                'kapasitas' => 2,
-                'fasilitas' => 'Queen Bed, AC, Smart TV, WiFi, Coffee Maker, Shower',
-                'deskripsi' => 'Kamar dengan ruang lebih luas dan fasilitas lengkap.'
-            ],
-            [
-                'nama_tipe' => 'Deluxe Room',
-                'harga' => 850000,
-                'kapasitas' => 2,
-                'fasilitas' => 'King Bed, AC, Smart TV, WiFi, Mini Bar, Bathtub',
-                'deskripsi' => 'Kemewahan ekstra dengan pemandangan kota yang indah.'
-            ],
-            [
-                'nama_tipe' => 'Junior Suite',
-                'harga' => 1500000,
-                'kapasitas' => 3,
-                'fasilitas' => 'King Bed + Sofa Bed, Kitchenette, Mini Bar, Bathtub, Living Area',
-                'deskripsi' => 'Sangat cocok untuk keluarga kecil yang menginginkan privasi lebih.'
-            ],
-            [
-                'nama_tipe' => 'Presidential Suite',
-                'harga' => 3500000,
-                'kapasitas' => 4,
-                'fasilitas' => '2 Super King Bed, Private Balcony, Jacuzzi, Dining Room, Personal Butler',
-                'deskripsi' => 'Layanan kasta tertinggi dengan fasilitas super mewah kelas dunia.'
-            ],
-        ];
+    [
+        'nama_tipe' => 'Standard Room',
+        'harga' => 350000,
+        'kapasitas' => 2,
+        'fasilitas' => 'Single Bed, AC, TV, WiFi, Shower',
+        'deskripsi' => 'Pilihan ekonomis untuk kenyamanan istirahat Anda.',
+        'foto' => 'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=600&auto=format&fit=crop',
+    ],
+    [
+        'nama_tipe' => 'Superior Room',
+        'harga' => 550000,
+        'kapasitas' => 2,
+        'fasilitas' => 'Queen Bed, AC, Smart TV, WiFi, Coffee Maker, Shower',
+        'deskripsi' => 'Kamar dengan ruang lebih luas dan fasilitas lengkap.',
+        'foto' => 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=600&auto=format&fit=crop',
+    ],
+    [
+        'nama_tipe' => 'Deluxe Room',
+        'harga' => 850000,
+        'kapasitas' => 2,
+        'fasilitas' => 'King Bed, AC, Smart TV, WiFi, Mini Bar, Bathtub',
+        'deskripsi' => 'Kemewahan ekstra dengan pemandangan kota yang indah.',
+        'foto' => 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=600&auto=format&fit=crop',
+    ],
+    [
+        'nama_tipe' => 'Junior Suite',
+        'harga' => 1500000,
+        'kapasitas' => 3,
+        'fasilitas' => 'King Bed + Sofa Bed, Kitchenette, Mini Bar, Bathtub, Living Area',
+        'deskripsi' => 'Sangat cocok untuk keluarga kecil yang menginginkan privasi lebih.',
+        'foto' => 'https://images.unsplash.com/photo-1591088398332-8a7791972843?w=600&auto=format&fit=crop',
+    ],
+    [
+        'nama_tipe' => 'Presidential Suite',
+        'harga' => 3500000,
+        'kapasitas' => 4,
+        'fasilitas' => '2 Super King Bed, Private Balcony, Jacuzzi, Dining Room, Personal Butler',
+        'deskripsi' => 'Layanan kasta tertinggi dengan fasilitas super mewah kelas dunia.',
+        'foto' => 'https://images.unsplash.com/photo-1631049552057-403cdb8f0658?w=600&auto=format&fit=crop',
+    ],
+];
 
         foreach ($roomTypes as $index => $type) {
             $createdType = TipeKamar::create($type);
