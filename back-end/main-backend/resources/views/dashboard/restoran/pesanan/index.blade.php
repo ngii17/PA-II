@@ -647,7 +647,7 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
                     @endphp
                     <tr data-payment="{{ $paymentStatus }}" 
                         data-queue="{{ $queueStatus }}"
-                        data-search="{{ strtolower($user['full_name'] ?? '') }} {{ strtolower($user['email'] ?? '') }} meja{{ $p->nomor_meja }} {{ $p->id }}">
+                        data-search="{{ strtolower($user['full_name'] ?? '') }} {{ strtolower($user['email'] ?? '') }} meja{{ $p->nomor_lokasi }} {{ $p->id }}">
                         <td class="text-muted fw-bold">{{ $i + 1 }}</td>
                         <td>
                             <div class="fw-bold text-dark">#{{ $p->id }}</div>
@@ -662,7 +662,7 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
                                 <div class="text-muted">Data tidak tersedia</div>
                             @endif
                         </td>
-                        <td><span class="badge-meja"><i class="fas fa-chair"></i> Meja {{ $p->nomor_meja }}</span></td>
+                        <td><span class="badge-meja"><i class="fas fa-chair"></i> Meja {{ $p->nomor_lokasi }}</span></td>
                         <td class="text-end fw-bold text-success">Rp {{ number_format($p->total_harga, 0, ',', '.') }}</td>
                         <td class="text-center"><span class="badge-payment {{ $paymentClass }}"><i class="fas {{ $paymentStatus == 1 ? 'fa-clock' : ($paymentStatus == 2 ? 'fa-check-circle' : 'fa-ban') }}"></i> {{ $paymentLabel }}</span></td>
                         <td class="text-center"><span class="badge-queue {{ $queueClass }}"><i class="fas {{ $queueStatus == 1 ? 'fa-hourglass-half' : ($queueStatus == 2 ? 'fa-spinner fa-pulse' : 'fa-check-double') }}"></i> {{ $queueLabel }}</span></td>
@@ -684,7 +684,7 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
                                 <div class="modal-body-premium">
                                     <div class="modal-pesanan-header">
                                         <div class="modal-pesanan-nomor">Pesanan #{{ $p->id }}</div>
-                                        <div class="modal-pesanan-meja"><i class="fas fa-chair"></i> Meja {{ $p->nomor_meja }} | <i class="fas fa-calendar"></i> {{ $p->created_at->format('d M Y, H:i') }}</div>
+                                        <div class="modal-pesanan-meja"><i class="fas fa-chair"></i> Meja {{ $p->nomor_lokasi }} | <i class="fas fa-calendar"></i> {{ $p->created_at->format('d M Y, H:i') }}</div>
                                     </div>
                                     <div class="modal-items-list">
                                         <div class="fw-bold text-muted mb-2" style="font-size:0.7rem;">DETAIL PESANAN</div>

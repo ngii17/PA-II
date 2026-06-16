@@ -618,11 +618,12 @@ body, input, select, textarea, button, label {
                             <form
                                 action="{{ route('dashboard.admin.broadcast.destroy', $b->id) }}"
                                 method="POST"
-                                onsubmit="return confirm('Hapus draft ini?')"
+                                id="deleteForm-{{ $b->id }}"
                             >
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn-delete" title="Hapus">
+                                <button type="button" class="btn-delete" title="Hapus"
+                                    onclick="confirmHapusBroadcast({{ $b->id }}, '{{ addslashes($b->judul) }}')">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </form>
@@ -648,5 +649,26 @@ body, input, select, textarea, button, label {
 
     </div>
 </div>
+
+@push('scripts')
+<script>
+function confirmHapusBroadcast(id, judul) {
+    Swal.fire({
+        icon: 'warning',
+        title: 'Hapus Broadcast?',
+        html: `Broadcast <strong style="color:#e11d48;">${judul}</strong> akan dihapus permanen dan tidak dapat dikembalikan.`,
+        showCancelButton: true,
+        confirmButtonColor: '#e11d48',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: '<i class="fas fa-trash"></i> Ya, Hapus',
+        cancelButtonText: 'Batal',
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('deleteForm-' + id).submit();
+        }
+    });
+}
+</script>
+@endpush
 
 @endsection

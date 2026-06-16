@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Validator;
 use Midtrans\Config;
 use Midtrans\Snap;
 use Illuminate\Support\Facades\Log; // <--- SUDAH BENAR
+use Illuminate\Support\Facades\Storage;
 
 
 class HotelController extends Controller
@@ -62,9 +63,22 @@ class HotelController extends Controller
                     $hargaAkhir = $hargaAsli - $potongan;
                 }
 
+                // Tentukan URL foto:
+                // Jika foto diawali 'http' berarti masih URL seeder lama, pakai langsung
+                // Jika foto adalah path lokal, generate URL storage
+                // Jika foto null/kosong, kembalikan null
+                if ($item->foto && str_starts_with($item->foto, 'http')) {
+                    $fotoUrl = $item->foto; // URL seeder lama, pakai apa adanya
+                } elseif ($item->foto) {
+                    $fotoUrl = asset('storage/' . $item->foto); // Path lokal dari upload staff
+                } else {
+                    $fotoUrl = null; // Belum ada foto
+                }
+
                 return [
                     'id'          => $item->id,
                     'nama_tipe'   => $item->nama_tipe,
+                    'foto'        => $fotoUrl, // ✅ Ditambahkan
                     'harga_asli'  => $hargaAsli,
                     'harga_akhir' => $hargaAkhir,
                     'kapasitas'   => $item->kapasitas,
@@ -97,6 +111,8 @@ class HotelController extends Controller
             'nama_tamu'         => 'required|string',
             'nik_identitas'     => 'required|string',
             'jumlah_tamu'       => 'required|integer',
+            // promo bersifat opsional
+            'promo_id'          => 'nullable|integer|exists:promo,id',
         ]);
 
         if ($validator->fails()) {
@@ -125,15 +141,50 @@ class HotelController extends Controller
 
         DB::beginTransaction();
         try {
+            // --- HITUNG ULANG POTONGAN PROMO DI BACKEND ---
+            $subtotal      = (float) $request->total_harga;
+            $potonganPromo = 0;
+            $promoId       = $request->promo_id ?? null;
+
+            if ($promoId) {
+                $promo = \App\Models\Hotel\Promo::find($promoId);
+
+                if ($promo) {
+                    // Validasi ulang promo masih aktif & belum dipakai user ini
+                    $masihAktif = $promo->is_active
+                        && now()->between($promo->tgl_mulai, $promo->tgl_selesai)
+                        && in_array($promo->kategori, ['hotel', 'semua']);
+
+                    $sudahDipakai = \App\Models\promo\PromoUsage::where('promo_id', $promoId)
+                        ->where('user_id', $request->user_id)
+                        ->exists();
+
+                    if ($masihAktif && !$sudahDipakai) {
+                        if ($promo->tipe_diskon === 'persen') {
+                            $potonganPromo = $subtotal * ($promo->nominal_potongan / 100);
+                        } else {
+                            // Voucher nominal > total harga → bayar Rp 0, tidak minus
+                            $potonganPromo = min((float) $promo->nominal_potongan, $subtotal);
+                        }
+                    } else {
+                        // Promo tidak valid / sudah dipakai → abaikan, lanjut tanpa diskon
+                        $promoId = null;
+                    }
+                }
+            }
+
+            $totalBayar = max($subtotal - $potonganPromo, 0);
+
+            // --- SIMPAN RESERVASI ---
             $reservasi = Reservasi::create([
-                'user_id'            => $request->user_id,
-                'fcm_token'          => $request->fcm_token,
-                'tipe_kamar_id'      => $request->tipe_kamar_id,
-                'tgl_checkin'        => $request->tgl_checkin,
-                'tgl_checkout'       => $request->tgl_checkout,
-                'total_malam'        => $request->total_malam,
-                'total_harga'        => $request->total_harga,
-                'metode_pembayaran'  => $request->metode_pembayaran,
+                'user_id'             => $request->user_id,
+                'fcm_token'           => $request->fcm_token,
+                'tipe_kamar_id'       => $request->tipe_kamar_id,
+                'tgl_checkin'         => $request->tgl_checkin,
+                'tgl_checkout'        => $request->tgl_checkout,
+                'total_malam'         => $request->total_malam,
+                'total_harga'         => $totalBayar,   // total setelah diskon
+                'metode_pembayaran'   => $request->metode_pembayaran,
                 'status_reservasi_id' => 1,
             ]);
 
@@ -144,18 +195,34 @@ class HotelController extends Controller
                 'jumlah_tamu'   => $request->jumlah_tamu,
             ]);
 
-            Config::$serverKey = env('MIDTRANS_SERVER_KEY');
-            Config::$isProduction = env('MIDTRANS_IS_PRODUCTION');
-            Config::$isSanitized = true;
-            Config::$is3ds = true;
+            // --- CATAT PENGGUNAAN PROMO (1 user 1 kali) ---
+            if ($promoId) {
+                \App\Models\promo\PromoUsage::firstOrCreate(
+                    [
+                        'promo_id' => $promoId,
+                        'user_id'  => $request->user_id,
+                    ],
+                    [
+                        'kategori' => 'hotel',
+                    ]
+                );
+            }
 
-            $method = $request->metode_pembayaran;
-            $enabledPayments = ($method == 'Transfer Bank') ? ['bank_transfer'] : ['gopay', 'shopeepay', 'qris'];
+            // --- INTEGRASI MIDTRANS ---
+            Config::$serverKey    = env('MIDTRANS_SERVER_KEY');
+            Config::$isProduction = env('MIDTRANS_IS_PRODUCTION');
+            Config::$isSanitized  = true;
+            Config::$is3ds        = true;
+
+            $method          = $request->metode_pembayaran;
+            $enabledPayments = ($method == 'Transfer Bank')
+                ? ['bank_transfer']
+                : ['gopay', 'shopeepay', 'dana', 'linkaja', 'qris'];
 
             $params = [
                 'transaction_details' => [
-                    'order_id' => 'INV-' . $reservasi->id . '-' . time(),
-                    'gross_amount' => (int) $request->total_harga,
+                    'order_id'     => 'INV-' . $reservasi->id . '-' . time(),
+                    'gross_amount' => (int) $totalBayar,
                 ],
                 'customer_details' => [
                     'first_name' => $request->nama_tamu,
@@ -168,7 +235,7 @@ class HotelController extends Controller
 
             $midtransResponse = Snap::createTransaction($params);
 
-            $snapToken = $midtransResponse->token;
+            $snapToken   = $midtransResponse->token;
             $redirectUrl = $midtransResponse->redirect_url;
 
             $reservasi->update(['snap_token' => $snapToken]);
@@ -176,10 +243,15 @@ class HotelController extends Controller
             DB::commit();
 
             return response()->json([
-                'success' => true,
-                'snap_token' => $snapToken,
+                'success'      => true,
+                'snap_token'   => $snapToken,
                 'redirect_url' => $redirectUrl,
-                'reservasi_id' => $reservasi->id
+                'reservasi_id' => $reservasi->id,
+                'data'         => [
+                    'subtotal'       => $subtotal,
+                    'potongan_promo' => $potonganPromo,
+                    'total_bayar'    => $totalBayar,
+                ],
             ], 201);
 
         } catch (\Exception $e) {
@@ -187,7 +259,6 @@ class HotelController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
     /**
      * 3. AMBIL RIWAYAT RESERVASI
      * Logika: Cek ulasan berdasarkan ID Reservasi unik
@@ -489,7 +560,33 @@ else if ($prefix == 'RESTO') {
         }
     }
 
+/**
+ * UPLOAD FOTO TIPE KAMAR
+ */
+public function uploadFotoTipeKamar(Request $request, $id)
+{
+    $request->validate([
+        'foto' => 'required|image|mimes:jpeg,png,jpg,webp|max:2048',
+    ]);
 
+    $tipeKamar = TipeKamar::findOrFail($id);
+
+    // Hapus foto lama jika bukan URL eksternal
+    if ($tipeKamar->foto && !str_starts_with($tipeKamar->foto, 'http')) {
+        Storage::disk('public')->delete($tipeKamar->foto);
+    }
+
+    // Simpan foto baru
+    $path = $request->file('foto')->store('tipe_kamar', 'public');
+
+    $tipeKamar->update(['foto' => $path]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Foto berhasil diupload',
+        'foto_url' => asset('storage/' . $path),
+    ]);
+}
 
 
 }

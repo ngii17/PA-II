@@ -215,9 +215,9 @@ public function login(Request $request)
 
         // Kita gunakan url('/') agar link mengarah ke IP Laptop kamu, bukan localhost
         $photoUrl = $user->profile_photo
-            ? url('storage/profiles/' . $user->profile_photo)
+            ? url('avatars/' . $user->profile_photo)  // ✅ BENAR!
             : "https://ui-avatars.com/api/?name=" . urlencode($user->full_name) . "&background=0D8ABC&color=fff";
-
+            
         return response()->json([
             'success' => true,
             'data'    => [
@@ -245,7 +245,7 @@ public function login(Request $request)
             'full_name' => 'required|string|min:3|max:20|regex:/^[a-zA-Z\s]+$/',
             'phone'     => ['required', 'string', 'min:10', 'max:16', 'regex:/^\+62\d+$/'],
             'address'   => 'required|string',
-            'image'     => 'nullable|image|mimes:jpg,png,jpeg|max:2048',
+            'avatar'    => 'nullable|string|in:avatar1.png,avatar2.png,avatar3.png,avatar4.png,avatar5.png,avatar6.png,avatar7.png,avatar8.png',
         ]);
 
         if ($validator->fails()) {
@@ -253,21 +253,16 @@ public function login(Request $request)
         }
 
         try {
-            if ($request->hasFile('image')) {
-                if ($user->profile_photo) {
-                    Storage::delete('public/profiles/' . $user->profile_photo);
-                }
-                $file = $request->file('image');
-                $fileName = time() . '_' . $user->username . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('public/profiles', $fileName);
-                $user->profile_photo = $fileName;
+            if ($request->avatar) {
+                $user->profile_photo = $request->avatar;
             }
 
             $user->update([
-                'username'  => $request->username,
-                'full_name' => $request->full_name,
-                'phone'     => $request->phone,
-                'address'   => $request->address,
+                'username'      => $request->username,
+                'full_name'     => $request->full_name,
+                'phone'         => $request->phone,
+                'address'       => $request->address,
+                'profile_photo' => $user->profile_photo,
             ]);
 
             return response()->json(['success' => true, 'message' => 'Profil berhasil diperbarui']);

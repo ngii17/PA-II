@@ -106,16 +106,19 @@ public function getMenus()
      */
     public function placeOrder(Request $request)
     {
-        // 1. Validasi Input (Ditambahkan tipe_pengantaran dan nomor_lokasi)
+        // 1. Validasi Input
         $validator = Validator::make($request->all(), [
             'user_id'           => 'required',
             'fcm_token'         => 'nullable|string',
             'metode_pembayaran' => 'required|string',
-            'tipe_pengantaran'  => 'required|string', // 'Meja' atau 'Kamar'
-            'nomor_lokasi'      => 'required|string',    // Nomor meja/kamarnya
+            'tipe_pengantaran'  => 'required|string',
+            'nomor_lokasi'      => 'required|string',
             'items'             => 'required|array',
             'items.*.menu_id'   => 'required|exists:menu,id',
             'items.*.jumlah'    => 'required|integer|min:1',
+            // promo bersifat opsional
+            'promo_id'          => 'nullable|integer|exists:promo,id',
+            'potongan_promo'    => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -128,7 +131,7 @@ public function getMenus()
             $totalHarga = 0;
             $orderItems = [];
 
-            // --- 2. LOGIKA VALIDASI & PENGURANGAN STOK ---
+            // --- 2. VALIDASI STOK & HITUNG TOTAL ---
             foreach ($request->items as $item) {
                 $menu = Menu::find($item['menu_id']);
 
@@ -139,7 +142,6 @@ public function getMenus()
                     ], 400);
                 }
 
-                // Potong stok di database
                 $menu->decrement('stok', $item['jumlah']);
 
                 $totalHarga += ($menu->harga * $item['jumlah']);
@@ -147,58 +149,91 @@ public function getMenus()
                     'menu_id'           => $menu->id,
                     'jumlah'            => $item['jumlah'],
                     'harga_at_porsi'    => $menu->harga,
-                    'status_pesanan_id' => 1, // Default: Menunggu
+                    'status_pesanan_id' => 1,
                 ];
             }
 
-            // --- 3. SIMPAN NOTA (HEADER) ---
-            // Menyimpan info Token FCM dan Lokasi Pengantaran (Meja/Kamar)
+            // --- 3. TERAPKAN POTONGAN PROMO (jika ada) ---
+            $potonganPromo = 0;
+            $promoId       = $request->promo_id ?? null;
+
+            if ($promoId) {
+                $promo = \App\Models\Hotel\Promo::find($promoId);
+
+                if ($promo) {
+                    // Hitung ulang di backend (tidak percaya angka dari Flutter)
+                    if ($promo->tipe_diskon === 'persen') {
+                        $potonganPromo = $totalHarga * ($promo->nominal_potongan / 100);
+                    } else {
+                        // Jika nominal voucher > total harga → potongan maksimal = total harga
+                        $potonganPromo = min((float) $promo->nominal_potongan, $totalHarga);
+                    }
+                }
+            }
+
+            $totalBayar = $totalHarga - $potonganPromo;
+            // Pastikan total bayar tidak pernah negatif
+            $totalBayar = max($totalBayar, 0);
+
+            // --- 4. SIMPAN NOTA (HEADER) ---
             $pesanan = PesananMenu::create([
                 'user_id'              => $request->user_id,
                 'fcm_token'            => $request->fcm_token,
-                'total_harga'          => $totalHarga,
+                'total_harga'          => $totalBayar,   // total setelah diskon
                 'metode_pembayaran'    => $request->metode_pembayaran,
-                'status_pembayaran_id' => 1, // 1 = Pending
-                'tipe_pengantaran'     => $request->tipe_pengantaran, // <--- BARU: Simpan 'Meja'/'Kamar'
-                'nomor_lokasi'         => $request->nomor_lokasi,     // <--- BARU: Simpan nomornya
+                'status_pembayaran_id' => 1,
+                'tipe_pengantaran'     => $request->tipe_pengantaran,
+                'nomor_lokasi'         => $request->nomor_lokasi,
             ]);
 
-            // --- 4. SIMPAN RINCIAN (DETAIL) ---
+            // --- 5. SIMPAN RINCIAN (DETAIL) ---
             foreach ($orderItems as $orderItem) {
                 $pesanan->details()->create($orderItem);
             }
 
-            // --- 5. INTEGRASI MIDTRANS ---
-            $snapToken = null;
+            // --- 6. CATAT PENGGUNAAN PROMO (1 user 1 kali) ---
+            if ($promoId) {
+                \App\Models\promo\PromoUsage::firstOrCreate(
+                    [
+                        'promo_id' => $promoId,
+                        'user_id'  => $request->user_id,
+                    ],
+                    [
+                        'kategori' => 'restoran',
+                    ]
+                );
+            }
+
+            // --- 7. INTEGRASI MIDTRANS ---
+            $snapToken   = null;
             $redirectUrl = null;
 
             if ($request->metode_pembayaran !== 'Bayar di Kasir') {
-                Config::$serverKey = env('MIDTRANS_SERVER_KEY');
+                Config::$serverKey    = env('MIDTRANS_SERVER_KEY');
                 Config::$isProduction = env('MIDTRANS_IS_PRODUCTION');
-                Config::$isSanitized = true;
-                Config::$is3ds = true;
+                Config::$isSanitized  = true;
+                Config::$is3ds        = true;
 
                 $enabledPayments = ($request->metode_pembayaran == 'Transfer Bank')
                     ? ['bank_transfer']
-                    : ['gopay', 'shopeepay', 'qris'];
+                    : ['gopay', 'shopeepay', 'dana', 'linkaja', 'qris'];
 
                 $params = [
                     'transaction_details' => [
                         'order_id'     => 'RESTO-' . $pesanan->id . '-' . time(),
-                        'gross_amount' => (int) $totalHarga,
+                        'gross_amount' => (int) $totalBayar,
                     ],
                     'customer_details' => [
                         'first_name' => 'User ID ' . $request->user_id,
-                        'notes'      => 'Antar ke ' . $request->tipe_pengantaran . ' ' . $request->nomor_lokasi
+                        'notes'      => 'Antar ke ' . $request->tipe_pengantaran . ' ' . $request->nomor_lokasi,
                     ],
                     'enabled_payments' => $enabledPayments,
                 ];
 
                 $midtransResponse = Snap::createTransaction($params);
-                $snapToken = $midtransResponse->token;
-                $redirectUrl = $midtransResponse->redirect_url;
+                $snapToken        = $midtransResponse->token;
+                $redirectUrl      = $midtransResponse->redirect_url;
 
-                // Update nota dengan Snap Token dari Midtrans
                 $pesanan->update(['snap_token' => $snapToken]);
             }
 
@@ -210,10 +245,12 @@ public function getMenus()
                 'snap_token'   => $snapToken,
                 'redirect_url' => $redirectUrl,
                 'data'         => [
-                    'order_id'    => $pesanan->id,
-                    'total_bayar' => $totalHarga,
-                    'lokasi'      => $request->tipe_pengantaran . ' ' . $request->nomor_lokasi
-                ]
+                    'order_id'       => $pesanan->id,
+                    'subtotal'       => $totalHarga,
+                    'potongan_promo' => $potonganPromo,
+                    'total_bayar'    => $totalBayar,
+                    'lokasi'         => $request->tipe_pengantaran . ' ' . $request->nomor_lokasi,
+                ],
             ], 201);
 
         } catch (\Exception $e) {
@@ -282,43 +319,46 @@ public function getMenus()
      * Logika: Cek ulasan berdasarkan ID Pesanan & ID Menu
      */
     public function getOrderHistory(Request $request)
-    {
-        $userId = $request->query('user_id');
-        if (!$userId) return response()->json(['success' => false, 'message' => 'User ID tidak ditemukan.'], 400);
+{
+    $userId = $request->query('user_id');
+    if (!$userId) return response()->json(['success' => false, 'message' => 'User ID tidak ditemukan.'], 400);
 
-        try {
-            $history = PesananMenu::with(['details.menu'])
-                ->where('user_id', $userId)
-                ->orderBy('created_at', 'desc')
-                ->get();
+    try {
+        $history = PesananMenu::with(['details.menu'])
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-            $data = $history->map(function ($order) {
-                // Map detail menu di dalam pesanan tersebut
-                $order->details = $order->details->map(function ($detail) use ($order) {
-                    
-                    // --- PERBAIKAN: Kunci pengecekan pada pesanan_menu_id DAN menu_id ---
-                    $review = \App\Models\restoran\UlasanRestoran::where('pesanan_menu_id', $order->id)
-                        ->where('menu_id', $detail->menu_id)
-                        ->first();
-                    
-                    $detail->is_reviewed = $review ? true : false;
-                    $detail->review_id = $review ? $review->id : null;
-                    $detail->existing_review = $review ? [
-                        'rating' => $review->rating,
-                        'komentar' => $review->komentar,
-                        'is_anonymous' => (bool)$review->is_anonymous
-                    ] : null;
-                    
-                    return $detail;
-                });
-                return $order;
+        $data = $history->map(function ($order) {
+            // Map detail menu di dalam pesanan tersebut
+            $order->details = $order->details->map(function ($detail) use ($order) {
+                
+                // --- PERBAIKAN: Kunci pengecekan pada pesanan_menu_id DAN menu_id ---
+                $review = \App\Models\restoran\UlasanRestoran::where('pesanan_menu_id', $order->id)
+                    ->where('menu_id', $detail->menu_id)
+                    ->first();
+                
+                $detail->is_reviewed = $review ? true : false;
+                $detail->review_id = $review ? $review->id : null;
+                $detail->existing_review = $review ? [
+                    'rating' => $review->rating,
+                    'komentar' => $review->komentar,
+                    'is_anonymous' => (bool)$review->is_anonymous
+                ] : null;
+                
+                // ✅ TAMBAH INI - status pesanan dari order
+                $detail->status_pesanan_id = (int) $order->status_pesanan_id;
+                
+                return $detail;
             });
+            return $order;
+        });
 
-            return response()->json(['success' => true, 'data' => $data]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
+        return response()->json(['success' => true, 'data' => $data]);
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
     }
+}
     
     /**
      * FUNGSI UPDATE STATUS PESANAN (Hanya 4 Status)

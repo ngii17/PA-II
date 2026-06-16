@@ -581,18 +581,7 @@ textarea.form-control-premium {
                                 </select>
                             </div>
 
-                            <!-- Stok -->
-                            <div class="col-md-6">
-                                <label class="form-label-premium">
-                                    <i class="fas fa-box"></i> Stok Menu
-                                </label>
-                                <input type="number"
-                                       name="stok"
-                                       class="form-control-premium"
-                                       value="{{ old('stok', $menu->stok) }}"
-                                       min="0"
-                                       required>
-                            </div>
+                           
 
                             <!-- Deskripsi -->
                             <div class="col-12">

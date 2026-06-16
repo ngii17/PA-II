@@ -35,9 +35,10 @@ Schedule::call(function () {
 
     foreach ($reservations as $res) {
         $notif->sendCheckinReminder(
-            'dummy_token_user', // Token HP User
-            $res->id,
-            '14:00' // Jam check-in standar
+            'dummy_token_user', // fcmToken
+            $res->user_id,      // userId ← tambahkan ini
+            $res->id,           // bookingId
+            '14:00'             // checkinTime
         );
     }
 })->dailyAt('09:00');
@@ -58,8 +59,10 @@ Schedule::call(function () {
 
     foreach ($reservations as $res) {
         $notif->sendCheckoutReminder(
-            'dummy_token_user', 
-            $res->id
+            'dummy_token_user', // fcmToken
+            $res->user_id,      // userId ← tambahkan ini
+            $res->id,           // bookingId
+            '14:00'             // checkoutTime
         );
     }
 })->dailyAt('08:00');

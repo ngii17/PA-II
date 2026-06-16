@@ -566,9 +566,6 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
             <h2>Manajemen <span>Stok</span></h2>
             <p><i class="fas fa-boxes me-1"></i> Kelola ketersediaan menu restoran hotel</p>
         </div>
-        <a href="{{ route('dashboard.restoran.menu.create') }}" class="btn-premium-primary">
-            <i class="fas fa-plus-circle"></i> Tambah Menu
-        </a>
     </div>
 
     <!-- Stats Strip -->

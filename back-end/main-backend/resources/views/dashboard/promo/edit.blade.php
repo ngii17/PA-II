@@ -491,17 +491,29 @@ body, input, select, textarea, button {
                         <label class="form-label-premium">Tipe Pemotongan <span class="required-dot"></span></label>
                         <div class="select-wrap">
                             <select name="tipe_diskon" id="inputTipe" class="form-select-premium" required>
-                                <option value="persen"  {{ $promo->tipe_diskon == 'persen'  ? 'selected' : '' }}>Persentase (%)</option>
-                                <option value="nominal" {{ $promo->tipe_diskon == 'nominal' ? 'selected' : '' }}>Nominal Flat (Rp)</option>
+                                <option value="persen" {{ $promo->tipe_diskon == 'persen' ? 'selected' : '' }}>Persentase (%)</option>
+                                @if($promo->kode_promo)
+                                    <option value="nominal" {{ $promo->tipe_diskon == 'nominal' ? 'selected' : '' }}>Potongan Harga (Rp)</option>
+                                @endif
                             </select>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label-premium">Besaran Potongan <span class="required-dot"></span></label>
-                        <input type="number" name="nominal_potongan" id="inputNominal"
-                            class="form-control-premium"
-                            value="{{ (int)$promo->nominal_potongan }}"
-                            min="0" required>
+                        @if($promo->tipe_diskon == 'persen')
+                            <div class="select-wrap">
+                                <select name="nominal_potongan" id="inputNominal" class="form-select-premium" required>
+                                    @for($i = 1; $i <= 100; $i++)
+                                        <option value="{{ $i }}" {{ (int)$promo->nominal_potongan == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                        @else
+                            <input type="number" name="nominal_potongan" id="inputNominal"
+                                class="form-control-premium"
+                                value="{{ (int)$promo->nominal_potongan }}"
+                                min="0" required>
+                        @endif
                         <div class="diskon-preview-inline" id="diskonPreviewInline">
                             <i class="fas fa-bolt"></i>
                             <span id="diskonPreviewText">
@@ -578,6 +590,72 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnText = document.getElementById('btnText');
     const mainForm = document.getElementById('mainForm');
 
+
+    // ==================================================
+// LOGIKA KODE VOUCHER → MEKANISME & BESARAN DISKON
+// ==================================================
+function syncTipeOptions() {
+    const hasKode = inputKode.value.trim() !== '';
+    const sudahAdaNominal = inputTipe.querySelector('option[value="nominal"]');
+
+    if (hasKode && !sudahAdaNominal) {
+        const opt = document.createElement('option');
+        opt.value = 'nominal';
+        opt.textContent = 'Potongan Harga (Rp)';
+        inputTipe.appendChild(opt);
+    } else if (!hasKode && sudahAdaNominal) {
+        sudahAdaNominal.remove();
+        inputTipe.value = 'persen';
+    }
+
+    syncBesaranDiskon();
+}
+
+function syncBesaranDiskon() {
+    const isPersen = inputTipe.value === 'persen';
+    const current = document.getElementById('inputNominal');
+    const currentVal = current.value;
+
+    if (isPersen && current.tagName !== 'SELECT') {
+        const selectEl = document.createElement('select');
+        selectEl.name = 'nominal_potongan';
+        selectEl.id = 'inputNominal';
+        selectEl.className = 'form-select-premium';
+        selectEl.required = true;
+
+        for (let i = 1; i <= 100; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = i;
+            if (parseInt(currentVal) === i) opt.selected = true;
+            selectEl.appendChild(opt);
+        }
+
+        current.replaceWith(selectEl);
+        document.getElementById('inputNominal').addEventListener('change', () => {
+            updatePreview();
+            markEdited(document.getElementById('inputNominal'));
+        });
+
+    } else if (!isPersen && current.tagName === 'SELECT') {
+        const inputEl = document.createElement('input');
+        inputEl.type = 'number';
+        inputEl.name = 'nominal_potongan';
+        inputEl.id = 'inputNominal';
+        inputEl.className = 'form-control-premium';
+        inputEl.placeholder = '0';
+        inputEl.min = '0';
+        inputEl.required = true;
+        inputEl.value = currentVal;
+        current.replaceWith(inputEl);
+
+        document.getElementById('inputNominal').addEventListener('input', () => {
+            updatePreview();
+            markEdited(document.getElementById('inputNominal'));
+        });
+    }
+}
+
     // Original values for change detection
     const originals = {};
     document.querySelectorAll('.form-control-premium, .form-select-premium').forEach(el => {
@@ -636,17 +714,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Auto uppercase for kode promo
     inputKode.addEventListener('input', function () {
-        const pos = this.selectionStart;
-        this.value = this.value.toUpperCase().replace(/\s/g, '');
-        this.setSelectionRange(pos, pos);
-        updatePreview();
-        markEdited(this);
+    const pos = this.selectionStart;
+    this.value = this.value.toUpperCase().replace(/\s/g, '');
+    this.setSelectionRange(pos, pos);
+    syncTipeOptions(); // <-- tambah ini
+    updatePreview();
+    markEdited(this);
     });
 
     // Attach listeners
     [inputNama, inputKategori, inputTipe, inputNominal].forEach(el => {
         el.addEventListener('input', function() { updatePreview(); markEdited(this); });
-        el.addEventListener('change', function() { updatePreview(); markEdited(this); });
+        el.addEventListener('change', function() { 
+            updatePreview(); 
+            markEdited(this);
+            if (el === inputTipe) syncBesaranDiskon(); // <-- tambah ini
+        });
     });
     document.querySelectorAll('input[type="date"]').forEach(el => {
         el.addEventListener('change', function() { markEdited(this); });

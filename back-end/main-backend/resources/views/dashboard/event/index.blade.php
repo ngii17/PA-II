@@ -446,20 +446,43 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
         @php
             // Event mapping untuk gambar realistis berkualitas tinggi
             $eventTheme = [
-                'imlek'    => ['name' => 'Tahun Baru Imlek', 'bg' => 'https://images.pexels.com/photos/2558197/pexels-photo-2558197.jpeg?auto=compress&cs=tinysrgb&w=800', 'color' => '#C62828', 'icon' => 'fa-dragon'],
-                'lebaran'  => ['name' => 'Idul Fitri', 'bg' => 'https://images.pexels.com/photos/3265992/pexels-photo-3265992.jpeg?auto=compress&cs=tinysrgb&w=800', 'color' => '#2E7D32', 'icon' => 'fa-moon'],
-                'natal'    => ['name' => 'Natal', 'bg' => 'https://images.pexels.com/photos/899330/pexels-photo-899330.jpeg?auto=compress&cs=tinysrgb&w=800', 'color' => '#0A5F38', 'icon' => 'fa-tree'],
-                'valentine'=> ['name' => 'Valentine', 'bg' => 'https://images.pexels.com/photos/1024228/pexels-photo-1024228.jpeg?auto=compress&cs=tinysrgb&w=800', 'color' => '#AD1457', 'icon' => 'fa-heart'],
-                'hut_ri'   => ['name' => 'HUT Kemerdekaan', 'bg' => 'https://images.pexels.com/photos/747964/pexels-photo-747964.jpeg?auto=compress&cs=tinysrgb&w=800', 'color' => '#C62828', 'icon' => 'fa-flag'],
-                'tahun_baru'=>['name' => 'Tahun Baru', 'bg' => 'https://images.pexels.com/photos/703603/pexels-photo-703603.jpeg?auto=compress&cs=tinysrgb&w=800', 'color' => '#1A237E', 'icon' => 'fa-clock'],
-                'default'  => ['name' => 'Event Spesial', 'bg' => 'https://images.pexels.com/photos/260689/pexels-photo-260689.jpeg?auto=compress&cs=tinysrgb&w=800', 'color' => '#00197D', 'icon' => 'fa-calendar'],
+                'default' => [
+                    'name'     => 'Tampilan Standar Purnama',
+                    'gradient' => 'linear-gradient(135deg, #0C2D6B 0%, #1a4a9c 50%, #C9A227 100%)',
+                    'icon'     => 'fa-hotel',
+                ],
+                'idul_fitri' => [
+                    'name'     => 'Lebaran Bersama Purnama',
+                    'gradient' => 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 60%, #FFD700 100%)',
+                    'icon'     => 'fa-moon',
+                ],
+                'natal_tahun_baru' => [
+                    'name'     => 'Christmas & New Year Purnama',
+                    'gradient' => 'linear-gradient(135deg, #B71C1C 0%, #C62828 50%, #2E7D32 100%)',
+                    'icon'     => 'fa-tree',
+                ],
+                'kemerdekaan' => [
+                    'name'     => 'HUT RI Purnama',
+                    'gradient' => 'linear-gradient(135deg, #C62828 0%, #E53935 60%, #F5F5F5 100%)',
+                    'icon'     => 'fa-flag',
+                ],
+                'imlek' => [
+                    'name'     => 'Imlek Bersama Purnama',
+                    'gradient' => 'linear-gradient(135deg, #D32F2F 0%, #B71C1C 50%, #FFC107 100%)',
+                    'icon'     => 'fa-dragon',
+                ],
+                'valentine' => [
+                    'name'     => "Valentine's Day Purnama",
+                    'gradient' => 'linear-gradient(135deg, #880E4F 0%, #AD1457 60%, #F48FB1 100%)',
+                    'icon'     => 'fa-heart',
+                ],
             ];
-            $code = $event->event_code ?? 'default';
+
+            $code  = $event->event_code ?? 'default';
             $theme = $eventTheme[$code] ?? $eventTheme['default'];
-            $bgImage = $theme['bg'];
-            $primaryColor = $event->primary_color ?? $theme['color'];
-            $icon = $theme['icon'];
-            
+            $bgStyle      = $theme['gradient'];
+            $primaryColor = $event->primary_color ?? '#0C2D6B';
+            $icon         = $theme['icon'];
             $isActive = $event->is_active ?? false;
             // Tentukan route edit berdasarkan role
             $editRoute = session('user.role') === 'admin'
@@ -467,10 +490,13 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
                 : route('dashboard.restoran.event.edit', $event->id);
         @endphp
         <div class="event-card">
-            <div class="event-preview" style="background-image: url('{{ $bgImage }}'); background-size: cover; background-position: center;">
+            {{-- Preview gradient tanpa URL eksternal --}}
+            <div class="event-preview" style="background: {{ $bgStyle }};">
                 <div class="event-preview-content">
                     <div class="event-preview-icon">
-                        <div class="event-icon-circle"><i class="fas {{ $icon }}"></i></div>
+                        <div class="event-icon-circle">
+                            <i class="fas {{ $icon }}"></i>
+                        </div>
                         <div>
                             <div class="event-preview-name">{{ $theme['name'] }}</div>
                             <div class="event-preview-date">Event {{ \Carbon\Carbon::parse($event->created_at)->format('Y') }}</div>

@@ -694,9 +694,6 @@
                             <div style="font-size:10px; color: var(--text-muted); text-transform:uppercase; letter-spacing:1px;">{{ session('user.role') }}</div>
                         </li>
                         <li>
-                            <a class="dropdown-item" href="{{ route('dashboard.profile') }}">
-                                <i class="ti ti-user-circle"></i> Profil Saya
-                            </a>
                         </li>
                         <li><hr class="dropdown-divider"></li>
                         <li>

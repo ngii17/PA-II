@@ -300,6 +300,72 @@ textarea.field-input { resize: vertical; line-height: 1.7; }
 }
 
 /* ============================================================
+   FOTO UPLOAD
+   ============================================================ */
+.foto-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    background: var(--surface-2);
+    cursor: pointer;
+    transition: .25s ease;
+    position: relative;
+}
+.foto-upload-area:hover {
+    border-color: var(--navy-mid);
+    background: #f0f4ff;
+}
+.foto-upload-area.has-preview {
+    border-style: solid;
+    border-color: #c0ceee;
+    padding: 16px;
+}
+.foto-upload-icon {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: rgba(0,25,125,.08);
+    color: var(--navy);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    margin: 0 auto 12px;
+}
+.foto-upload-text {
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.foto-upload-text strong {
+    color: var(--navy);
+    cursor: pointer;
+}
+.foto-upload-text span {
+    display: block;
+    font-size: .68rem;
+    margin-top: 4px;
+}
+.foto-preview-img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 12px;
+    display: none;
+}
+.foto-preview-img.visible { display: block; }
+.foto-change-btn {
+    margin-top: 10px;
+    font-size: .72rem;
+    font-weight: 700;
+    color: var(--navy);
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    gap: 5px;
+    justify-content: center;
+}
+.foto-change-btn.visible { display: flex; }
+
+/* ============================================================
    FOOTER BUTTONS
    ============================================================ */
 .form-footer {
@@ -408,7 +474,8 @@ textarea.field-input { resize: vertical; line-height: 1.7; }
     <div class="form-card" id="formCard">
         <div class="form-card-accent"></div>
 
-        <form action="{{ route('dashboard.hotel.tipe-kamar.store') }}" method="POST" id="tipeForm">
+        {{-- ✅ Tambahkan enctype multipart agar foto bisa dikirim --}}
+        <form action="{{ route('dashboard.hotel.tipe-kamar.store') }}" method="POST" id="tipeForm" enctype="multipart/form-data">
             @csrf
 
             <!-- Section 1: Identitas -->
@@ -502,6 +569,49 @@ textarea.field-input { resize: vertical; line-height: 1.7; }
                 </div>
             </div>
 
+            <!-- ✅ Section 4: Foto Kamar — BARU -->
+            <div class="form-section">
+                <div class="section-title">
+                    <div class="section-title-icon navy"><i class="fas fa-camera"></i></div>
+                    Foto Kamar
+                </div>
+                <div class="field-wrap full">
+                    <label class="field-label">Foto Tipe Kamar</label>
+
+                    {{-- Area klik untuk upload --}}
+                    <div class="foto-upload-area" id="fotoUploadArea" onclick="document.getElementById('fotoInput').click()">
+                        <div id="fotoPlaceholder">
+                            <div class="foto-upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <div class="foto-upload-text">
+                                <strong>Klik untuk pilih foto</strong> atau seret ke sini
+                                <span>Format: JPG, PNG, WEBP &bull; Maks: 2MB</span>
+                            </div>
+                        </div>
+                        <img id="fotoPreviewImg" class="foto-preview-img" src="" alt="Preview Foto">
+                    </div>
+
+                    {{-- Tombol ganti foto (muncul setelah ada preview) --}}
+                    <div class="foto-change-btn" id="fotoChangeBtn" onclick="document.getElementById('fotoInput').click()">
+                        <i class="fas fa-sync-alt"></i> Ganti Foto
+                    </div>
+
+                    {{-- Input file tersembunyi --}}
+                    <input type="file" name="foto" id="fotoInput"
+                           accept="image/jpeg,image/png,image/webp"
+                           style="display:none;">
+
+                    @error('foto')
+                    <span class="invalid-msg"><i class="fas fa-times-circle"></i> {{ $message }}</span>
+                    @enderror
+
+                    <span class="field-hint">
+                        <i class="fas fa-info-circle"></i> Foto ini akan ditampilkan di aplikasi mobile untuk semua kamar dengan tipe ini.
+                    </span>
+                </div>
+            </div>
+
             <!-- Footer -->
             <div class="form-footer">
                 <button type="submit" class="btn-submit">
@@ -570,6 +680,40 @@ document.addEventListener('DOMContentLoaded', function () {
             const label = this.closest('.field-wrap')?.querySelector('.field-label');
             if (label) label.style.color = '';
         });
+    });
+
+    // ✅ Preview foto sebelum upload
+    const fotoInput      = document.getElementById('fotoInput');
+    const fotoPreviewImg = document.getElementById('fotoPreviewImg');
+    const fotoUploadArea = document.getElementById('fotoUploadArea');
+    const fotoPlaceholder = document.getElementById('fotoPlaceholder');
+    const fotoChangeBtn  = document.getElementById('fotoChangeBtn');
+
+    fotoInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        // Validasi ukuran di sisi client
+        if (file.size > 2 * 1024 * 1024) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Ukuran Terlalu Besar',
+                text: 'Ukuran foto maksimal 2MB.',
+                confirmButtonColor: '#00197D',
+            });
+            this.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            fotoPreviewImg.src = e.target.result;
+            fotoPreviewImg.classList.add('visible');
+            fotoPlaceholder.style.display = 'none';
+            fotoUploadArea.classList.add('has-preview');
+            fotoChangeBtn.classList.add('visible');
+        };
+        reader.readAsDataURL(file);
     });
 });
 </script>

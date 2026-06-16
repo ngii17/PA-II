@@ -16,7 +16,8 @@ class TipeKamar extends Model
         'harga',
         'kapasitas',
         'fasilitas',
-        'deskripsi'
+        'deskripsi',
+        'foto',
     ];
 
     protected $dates = ['deleted_at'];

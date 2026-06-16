@@ -89,3 +89,6 @@ Route::delete('/review/hotel/{id}', [UlasanController::class, 'destroyHotelRevie
 Route::post('/pembayaran/confirm/{id}', [PembayaranHotelController::class, 'confirmPayment'])->name('dashboard.hotel.pembayaran.confirm');
 
 Route::get('/promo/active', [PromoController::class, 'activeForApi']);
+
+Route::post('/tipe-kamar/{id}/upload-foto', [HotelController::class, 'uploadFotoTipeKamar'])
+    ->name('tipe-kamar.upload-foto');

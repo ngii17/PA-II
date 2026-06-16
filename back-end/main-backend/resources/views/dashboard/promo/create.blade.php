@@ -630,7 +630,7 @@ body, input, select, textarea, button {
                         <div class="select-wrap">
                             <select name="tipe_diskon" id="inputTipe" class="form-select-premium" required>
                                 <option value="persen">Persentase (%)</option>
-                                <option value="nominal">Potongan Harga (Rp)</option>
+                                {{-- opsi nominal muncul via JS saat kode voucher berisi --}}
                             </select>
                         </div>
                     </div>
@@ -661,6 +661,25 @@ body, input, select, textarea, button {
                     </div>
                 </div>
             </div>
+
+            <!-- Section 4: Notifikasi -->
+<div class="form-section" style="padding-top:28px; padding-bottom:28px;">
+    <div class="form-section-title">
+        <div class="section-icon"><i class="fas fa-bell"></i></div>
+        <span>Notifikasi Pengguna</span>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <input type="checkbox" name="send_notification" id="sendNotif" value="1"
+               style="width:20px;height:20px;cursor:pointer;accent-color:#00197D;">
+        <label for="sendNotif" style="cursor:pointer;font-weight:600;color:#0f172a;margin:0;">
+            Kirim notifikasi pop-up ke semua pengguna saat promo ini dibuat
+        </label>
+    </div>
+    <span class="helper-text" style="margin-top:8px;">
+        <i class="fas fa-info-circle"></i> 
+        Notifikasi akan dikirim ke semua HP pengguna yang sudah terdaftar.
+    </span>
+</div>
 
             <!-- Footer -->
             <div class="form-footer">
@@ -703,6 +722,76 @@ document.addEventListener('DOMContentLoaded', function () {
     const dateDuration     = document.getElementById('dateDuration');
 
     const requiredFields = [inputNama, inputKategori, inputNominal, inputMulai, inputSelesai];
+
+
+    // ==================================================
+// LOGIKA KODE VOUCHER → MEKANISME & BESARAN DISKON
+// ==================================================
+function syncTipeOptions() {
+    const hasKode = inputKode.value.trim() !== '';
+    const sudahAdaNominal = inputTipe.querySelector('option[value="nominal"]');
+
+    if (hasKode && !sudahAdaNominal) {
+        const opt = document.createElement('option');
+        opt.value = 'nominal';
+        opt.textContent = 'Potongan Harga (Rp)';
+        inputTipe.appendChild(opt);
+    } else if (!hasKode && sudahAdaNominal) {
+        sudahAdaNominal.remove();
+        inputTipe.value = 'persen'; // reset ke persen jika nominal sedang dipilih
+    }
+
+    syncBesaranDiskon();
+}
+
+function syncBesaranDiskon() {
+    const isPersen = inputTipe.value === 'persen';
+
+    if (isPersen) {
+        // Ganti jadi dropdown 1-100
+        const selectEl = document.createElement('select');
+        selectEl.name = 'nominal_potongan';
+        selectEl.id = 'inputNominal';
+        selectEl.className = 'form-select-premium';
+        selectEl.required = true;
+
+        for (let i = 1; i <= 100; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = i;
+            selectEl.appendChild(opt);
+        }
+
+        const current = document.getElementById('inputNominal');
+        current.replaceWith(selectEl);
+
+        // Re-bind event
+        document.getElementById('inputNominal').addEventListener('change', () => {
+            updatePreview();
+            updateProgress();
+        });
+    } else {
+        // Ganti jadi input number biasa
+        const current = document.getElementById('inputNominal');
+        if (current.tagName === 'SELECT') {
+            const inputEl = document.createElement('input');
+            inputEl.type = 'number';
+            inputEl.name = 'nominal_potongan';
+            inputEl.id = 'inputNominal';
+            inputEl.className = 'form-control-premium';
+            inputEl.placeholder = '0';
+            inputEl.min = '0';
+            inputEl.required = true;
+            current.replaceWith(inputEl);
+
+            // Re-bind event
+            document.getElementById('inputNominal').addEventListener('input', () => {
+                updatePreview();
+                updateProgress();
+            });
+        }
+    }
+}
 
     // ==================================================
     // VALIDASI TANGGAL DENGAN STRING LANGSUNG (Y-m-d)
@@ -867,6 +956,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const pos = this.selectionStart;
         this.value = this.value.toUpperCase().replace(/\s/g, '');
         this.setSelectionRange(pos, pos);
+        syncTipeOptions();
         updatePreview();
     });
 
@@ -877,7 +967,12 @@ document.addEventListener('DOMContentLoaded', function () {
         el.addEventListener('input', () => { checkFilled(el); updatePreview(); updateProgress(); });
     });
     [inputKategori, inputTipe].forEach(el => {
-        el.addEventListener('change', () => { checkFilled(el); updatePreview(); updateProgress(); });
+        el.addEventListener('change', () => { 
+            checkFilled(el); 
+            updatePreview(); 
+            updateProgress();
+            if (el === inputTipe) syncBesaranDiskon(); // <-- tambah ini
+        });
     });
 
     // Event untuk tanggal: pakai 'input' dan 'change' agar selalu terdeteksi (baik picker maupun manual)
@@ -937,6 +1032,7 @@ document.addEventListener('DOMContentLoaded', function () {
     updateProgress();
     updatePreview();
     updateDateRangeVisual();
+    syncTipeOptions();
 });
 </script>
 

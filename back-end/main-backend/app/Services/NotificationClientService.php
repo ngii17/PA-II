@@ -34,19 +34,19 @@ class NotificationClientService
         }
     }
 
-    // 1. Pesanan Dikonfirmasi (Ditambah $userId)
+    // 1. Pesanan Dikonfirmasi
     public function bookingConfirmed($fcmToken, $userId, $bookingId, $roomType, $checkinDate)
     {
         return $this->post('booking-confirmed', [
             'fcm_token'    => $fcmToken,
-            'user_id'      => $userId, // <--- Sekarang terkirim ke 8002
+            'user_id'      => $userId,
             'booking_id'   => $bookingId,
             'room_type'    => $roomType,
             'checkin_date' => $checkinDate,
         ]);
     }
 
-    // 2. Pesanan Dibatalkan (Ditambah $userId)
+    // 2. Pesanan Dibatalkan
     public function bookingCancelled($fcmToken, $userId, $bookingId, $refundInfo)
     {
         return $this->post('booking-cancelled', [
@@ -57,7 +57,7 @@ class NotificationClientService
         ]);
     }
 
-    // 3. Pengingat Check-in (Ditambah $userId)
+    // 3. Pengingat Check-in
     public function sendCheckinReminder($fcmToken, $userId, $bookingId, $checkinTime)
     {
         return $this->post('checkin-reminder', [
@@ -68,7 +68,7 @@ class NotificationClientService
         ]);
     }
 
-    // 4. Kamar Siap (Ditambah $userId)
+    // 4. Kamar Siap
     public function roomReady($fcmToken, $userId, $roomNumber)
     {
         return $this->post('room-ready', [
@@ -78,7 +78,7 @@ class NotificationClientService
         ]);
     }
 
-    // 5. Pengingat Check-out (Ditambah $userId)
+    // 5. Pengingat Check-out
     public function sendCheckoutReminder($fcmToken, $userId, $bookingId)
     {
         return $this->post('checkout-reminder', [
@@ -88,7 +88,7 @@ class NotificationClientService
         ]);
     }
 
-    // 6. Pembayaran Gagal (Ditambah $userId)
+    // 6. Pembayaran Gagal
     public function paymentFailed($fcmToken, $userId, $bookingId)
     {
         return $this->post('payment-failed', [
@@ -98,25 +98,18 @@ class NotificationClientService
         ]);
     }
 
-    // Tambahkan ini di dalam class NotificationClientService
-
-    /**
-     * Notifikasi Pesanan Restoran Dikonfirmasi
-     */
+    // 7. Pesanan Restoran Dikonfirmasi
     public function orderConfirmed($fcmToken, $userId, $orderId, $totalHarga)
-{
-    // Pastikan endpoint-nya adalah 'order-confirmed' sesuai routes/api.php di Port 8002
-    return $this->post('order-confirmed', [
-        'fcm_token'  => $fcmToken,
-        'user_id'    => $userId,
-        'order_id'   => $orderId,
-        'total_bayar'=> $totalHarga,
-    ]);
-}
+    {
+        return $this->post('order-confirmed', [
+            'fcm_token'   => $fcmToken,
+            'user_id'     => $userId,
+            'order_id'    => $orderId,
+            'total_bayar' => $totalHarga,
+        ]);
+    }
 
-/**
-     * Notifikasi Pesanan Restoran Siap Disajikan
-     */
+    // 8. Pesanan Restoran Siap
     public function orderReady($fcmToken, $userId, $orderId)
     {
         return $this->post('order-ready', [
@@ -126,9 +119,7 @@ class NotificationClientService
         ]);
     }
 
-    /**
-     * Notifikasi Pesanan Restoran Dibatalkan
-     */
+    // 9. Pesanan Restoran Dibatalkan
     public function orderCancelled($fcmToken, $userId, $orderId)
     {
         return $this->post('order-cancelled', [
@@ -138,32 +129,42 @@ class NotificationClientService
         ]);
     }
 
+    // 10. Broadcast Promo (versi lama - tetap dipertahankan)
     public function broadcastPromo($tokens, $title, $body)
     {
         return $this->post('broadcast', [
-            'tokens' => $tokens, // Mengirimkan Array
+            'tokens' => $tokens,
             'title'  => $title,
             'body'   => $body,
         ]);
     }
 
     /**
-     * Kirim Notifikasi Massal (Broadcast) ke Port 8002
+     * 11. Kirim Notifikasi Massal (Broadcast Promo) ke Port 8002
+     * FIX: Filter recipients yang tokennya null sebelum dikirim
      */
     public function massSend($data)
     {
-        // Pastikan endpoint-nya sesuai dengan yang ada di Port 8002
-        // Berdasarkan route:list kamu sebelumnya, prefix-nya adalah 'notify'
+        // Filter hanya recipients yang punya token valid
+        $data['recipients'] = array_values(array_filter(
+            $data['recipients'],
+            fn($r) => !empty($r['token'])
+        ));
+
+        // Jika tidak ada recipient valid, log warning dan berhenti
+        if (empty($data['recipients'])) {
+            Log::warning('massSend: Tidak ada recipient dengan token valid, broadcast dibatalkan.');
+            return null;
+        }
+
+        Log::info('massSend: Mengirim broadcast ke ' . count($data['recipients']) . ' perangkat.');
+
         return $this->post('broadcast/send', $data);
     }
 
-
-    /**
-     * Notifikasi Check-in Berhasil
-     */
+    // 12. Notifikasi Check-in Berhasil
     public function sendCheckinSuccess($fcmToken, $userId, $roomNumber)
     {
-        // Fungsi ini memanggil 'post' yang private (karena masih satu class, ini dibolehkan)
         return $this->post('hotel/checkin-success', [
             'fcm_token'   => $fcmToken,
             'user_id'     => $userId,
@@ -171,11 +172,7 @@ class NotificationClientService
         ]);
     }
 
-
-
-    /**
-     * Notifikasi Check-out Berhasil
-     */
+    // 13. Notifikasi Check-out Berhasil
     public function sendCheckoutSuccess($fcmToken, $userId, $reservationId)
     {
         return $this->post('hotel/checkout-success', [
@@ -184,5 +181,4 @@ class NotificationClientService
             'reservation_id' => $reservationId,
         ]);
     }
-    
 }

@@ -71,7 +71,7 @@ class PromoController extends Controller
             if ($request->send_notification == "1") {
                 
                 // 1. Ambil seluruh token HP dari Port 8000 via API Internal
-                $urlAuth = env('MIKRO_URL', 'http://10.187.82.132:8000') . '/api/internal/user-tokens';
+                $urlAuth = env('MIKRO_URL') . '/api/internal/user-tokens';
                 $authRes = Http::timeout(10)->get($urlAuth);
                 $recipients = $authRes->json('data') ?? [];
 
