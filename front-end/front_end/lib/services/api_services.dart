@@ -231,11 +231,21 @@ class ApiServices {
 
   static Future<Map<String, dynamic>> placeRestaurantOrder(Map<String, dynamic> data) async {
     try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? token = prefs.getString('auth_token');
+
+      if (token == null) {
+        return {'success': false, 'message': 'Token tidak ditemukan, silakan login ulang'};
+      }
+
+      data.remove('user_id'); // buang user_id kalau masih ada di data
+
       final response = await http.post(
         Uri.parse("$_hotelUrl/menus/order"),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': 'Bearer $token', // ← tambahan ini
         },
         body: jsonEncode(data),
       );
