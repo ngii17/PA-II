@@ -6,6 +6,8 @@ import 'edit_profile_screen.dart';
 import '../event/event_header.dart';
 
 class ProfileScreen extends StatefulWidget {
+
+  static const String ipAddress = "10.158.185.132"; 
   const ProfileScreen({super.key});
 
   @override
@@ -25,10 +27,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _profileData = ApiServices.getUserProfile().then((result) {
         if (result['success'] == true && result['data']['profile_photo'] != null) {
-          String originalUrl = result['data']['profile_photo'];
-          final separator = originalUrl.contains('?') ? '&' : '?';
-          result['data']['profile_photo'] =
-              "$originalUrl${separator}t=${DateTime.now().millisecondsSinceEpoch}";
+          String photo = result['data']['profile_photo'];
+          // Tambahkan cache busting query parameter (seperti home page)
+          result['data']['profile_photo'] = 
+              '$photo?t=${DateTime.now().millisecondsSinceEpoch}';
         }
         return result;
       });
@@ -136,17 +138,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           radius: 65,
                           backgroundColor: Colors.white,
                           backgroundImage: user['profile_photo'] != null
-                              ? NetworkImage(user['profile_photo'])
-                              : null,
+                            ? NetworkImage(user['profile_photo']) // ← LANGSUNG PAKAI full URL dari API!
+                            : null,
                           onBackgroundImageError: user['profile_photo'] != null
                               ? (exception, stackTrace) {}
                               : null,
                           child: user['profile_photo'] == null
                               ? Text(
-                                  user['full_name']
-                                          ?.substring(0, 1)
-                                          .toUpperCase() ??
-                                      "P",
+                                  user['full_name']?.substring(0, 1).toUpperCase() ?? "P",
                                   style: TextStyle(
                                       fontSize: 45,
                                       fontWeight: FontWeight.bold,

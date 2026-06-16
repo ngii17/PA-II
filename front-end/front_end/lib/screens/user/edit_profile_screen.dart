@@ -1,14 +1,15 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/api_services.dart';
 import '../../providers/event_provider.dart';
 import '../event/event_header.dart';
+import 'profile_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
+  static const String ipAddress = "10.158.185.132"; 
+
   final Map<String, dynamic> userData;
   const EditProfileScreen({super.key, required this.userData});
 
@@ -22,13 +23,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _addressController;
   late TextEditingController _phoneController;
 
-  File? _imageFile;
+  String? _selectedAvatar;
   String? _currentPhotoUrl;
   bool _isLoading = false;
-  final ImagePicker _picker = ImagePicker();
 
   String _fullPhoneNumber = "";
   String? _uError, _fnError;
+
+  final List<String> _avatarList = [
+    'avatar1.png', 'avatar2.png', 'avatar3.png', 'avatar4.png',
+    'avatar5.png', 'avatar6.png', 'avatar7.png', 'avatar8.png',
+  ];
+
+  // Ganti dengan URL backend kamu
 
   @override
   void initState() {
@@ -37,6 +44,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _fullNameController = TextEditingController(text: widget.userData['full_name']);
     _addressController = TextEditingController(text: widget.userData['address']);
     _currentPhotoUrl = widget.userData['profile_photo'];
+    _selectedAvatar = widget.userData['profile_photo'];
 
     _fullPhoneNumber = widget.userData['phone'] ?? "";
     String cleanPhone = _fullPhoneNumber.replaceAll("+62", "");
@@ -50,30 +58,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final XFile? selected = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 50,
-    );
-    if (selected != null) setState(() => _imageFile = File(selected.path));
-  }
-
-  void _handleDeletePhoto() async {
-    setState(() => _isLoading = true);
-    final result = await ApiServices.deleteProfilePhoto();
-    setState(() => _isLoading = false);
-
-    if (result['success'] == true) {
-      setState(() {
-        _imageFile = null;
-        _currentPhotoUrl = "https://ui-avatars.com/api/?name=${_fullNameController.text}&background=00197D&color=fff";
-      });
-      _showSnackBar("Foto profil dihapus", Colors.green);
-    } else {
-      _showSnackBar(result['message'] ?? "Gagal menghapus foto", Colors.red);
-    }
   }
 
   void _showSnackBar(String msg, Color color) {
@@ -98,7 +82,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       fullName: _fullNameController.text,
       phone: _fullPhoneNumber,
       address: _addressController.text,
-      imageFile: _imageFile,
+      avatar: _selectedAvatar,
     );
     setState(() => _isLoading = false);
 
@@ -112,6 +96,71 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+String _getAvatarUrl(String? avatarNameOrUrl) {
+  if (avatarNameOrUrl == null || avatarNameOrUrl.isEmpty) {
+    return '';
+  }
+  
+  // Jika sudah full URL (dimulai dengan http), pakai langsung
+  if (avatarNameOrUrl.startsWith('http')) {
+    return avatarNameOrUrl;
+  }
+  
+  // Jika hanya nama file (avatar3.png), construct URL
+  return 'http://${ProfileScreen.ipAddress}:8000/avatars/$avatarNameOrUrl';
+}
+
+
+  void _showAvatarPicker(Color primaryColor, Color buttonColor, Color buttonTextColor) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Pilih Avatar", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryColor)),
+            const SizedBox(height: 20),
+            GridView.builder(
+              shrinkWrap: true,
+              itemCount: _avatarList.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemBuilder: (context, index) {
+                final avatar = _avatarList[index];
+                final isSelected = _selectedAvatar == avatar;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _selectedAvatar = avatar);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? primaryColor : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                    child: CircleAvatar(
+  backgroundImage: NetworkImage(_getAvatarUrl(avatar)),
+),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventProvider = context.watch<EventProvider>();
@@ -120,7 +169,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final Color secondaryColor = hasEvent ? eventProvider.secondaryColor : const Color(0xFFD4AF37);
     final Color onPrimary = primaryColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
 
-    // Warna tombol: pilih yang lebih kontras (secondary jika cukup berbeda)
     final Color buttonColor = (primaryColor.computeLuminance() - secondaryColor.computeLuminance()).abs() < 0.08
         ? primaryColor
         : secondaryColor;
@@ -131,6 +179,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       end: Alignment.bottomRight,
       colors: [primaryColor, secondaryColor.withOpacity(0.85)],
     );
+
+// URL avatar yang sedang dipilih
+final String? avatarUrl = _selectedAvatar != null
+    ? _getAvatarUrl(_selectedAvatar)
+    : _currentPhotoUrl;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -170,7 +223,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               child: Center(
                 child: Stack(
                   children: [
-                    // Avatar
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
@@ -180,22 +232,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       child: CircleAvatar(
                         radius: 65,
                         backgroundColor: Colors.white,
-                        backgroundImage: _imageFile != null
-                            ? FileImage(_imageFile!) as ImageProvider
-                            : (_currentPhotoUrl != null && _currentPhotoUrl!.isNotEmpty
-                                ? NetworkImage(_currentPhotoUrl!)
-                                : null),
-                        child: (_imageFile == null && (_currentPhotoUrl == null || _currentPhotoUrl!.isEmpty))
-                            ? Icon(Icons.person, size: 70, color: primaryColor)
-                            : null,
+                        backgroundImage: avatarUrl != null 
+                          ? NetworkImage('$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}') 
+                          : null,
+                        child: avatarUrl == null
+                          ? Icon(Icons.person, size: 70, color: primaryColor)
+                          : null,
                       ),
                     ),
-                    // Tombol Kamera
+                    // Tombol ganti avatar
                     Positioned(
                       bottom: 4,
                       right: 4,
                       child: GestureDetector(
-                        onTap: _pickImage,
+                        onTap: () => _showAvatarPicker(primaryColor, buttonColor, buttonTextColor),
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
@@ -204,28 +254,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             border: Border.all(color: Colors.white, width: 2),
                             boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.5), blurRadius: 8)],
                           ),
-                          child: Icon(Icons.camera_alt, color: buttonTextColor, size: 20),
+                          child: Icon(Icons.face_retouching_natural, color: buttonTextColor, size: 20),
                         ),
                       ),
                     ),
-                    // Tombol Hapus (jika ada foto)
-                    if ((_currentPhotoUrl != null && !_currentPhotoUrl!.contains('ui-avatars')) || _imageFile != null)
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: _handleDeletePhoto,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade400,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Icon(Icons.delete_forever, color: Colors.white, size: 16),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -300,15 +332,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
-            letterSpacing: 0.8,
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700, letterSpacing: 0.8)),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
@@ -334,15 +358,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          "NOMOR HANDPHONE",
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
-            letterSpacing: 0.8,
-          ),
-        ),
+        Text("NOMOR HANDPHONE", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700, letterSpacing: 0.8)),
         const SizedBox(height: 6),
         Row(
           children: [

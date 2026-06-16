@@ -6,6 +6,7 @@ import 'room_type_screen.dart';
 import 'booking_screen.dart';
 import '../event/event_header.dart';
 import '../notification/notification_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ─────────────────────────────────────────────
 //  WARNA (konsisten dengan home_screen.dart)
@@ -102,7 +103,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           child: Stack(
                             children: [
                               Image.network(
-                                "https://plus.unsplash.com/premium_photo-1675745329954-9639d3b74bbf?q=80&w=2000&auto=format&fit=crop",
+                                widget.room.foto ?? '',
                                 height: 220,
                                 width: double.infinity,
                                 fit: BoxFit.cover,
@@ -937,49 +938,59 @@ class _BottomBookingBar extends StatelessWidget {
           // Tombol Book Now — sisa lebar
           Expanded(
             child: GestureDetector(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => BookingScreen(room: room)),
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      primaryColor,
-                      primaryColor.withOpacity(0.85),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withOpacity(0.4),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+                onTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    int? userId = prefs.getInt('user_id');
+                    if (userId == null || userId == 0) {
+                        if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text("Silakan login terlebih dahulu untuk melakukan reservasi kamar."),
+                                    backgroundColor: Colors.red,
+                                    behavior: SnackBarBehavior.floating,
+                                ),
+                            );
+                        }
+                        return;
+                    }
+                    if (context.mounted) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => BookingScreen(room: room)));
+                    }
+                },
+                child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                            colors: [primaryColor, primaryColor.withOpacity(0.85)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                            BoxShadow(
+                                color: primaryColor.withOpacity(0.4),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                            ),
+                        ],
                     ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.calendar_month_rounded,
-                        color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      "PESAN SEKARANG",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        letterSpacing: 0.5,
-                      ),
+                    child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                            Icon(Icons.calendar_month_rounded, color: Colors.white, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                                "PESAN SEKARANG",
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    letterSpacing: 0.5,
+                                ),
+                            ),
+                        ],
                     ),
-                  ],
                 ),
-              ),
             ),
-          ),
+        ),
         ],
       ),
     );

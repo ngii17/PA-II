@@ -8,6 +8,7 @@ import 'checkout_screen.dart';
 import 'cart_screen.dart';
 import '../notification/notification_screen.dart';
 import '../event/event_header.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MenuDetailScreen extends StatefulWidget {
   final MenuResto menu;
@@ -31,18 +32,73 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
     _reviewData = ApiServices.getRestoReviews(widget.menu.id);
   }
 
-  void _addToCart() {
+  void _addToCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    int? userId = prefs.getInt('user_id');
+
+    if (userId == null || userId == 0) {
+        if (mounted) {
+            showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                    content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                            Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.lock_outline_rounded, color: Colors.red.shade400, size: 40),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                                "Login Diperlukan",
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                                "Silakan login terlebih dahulu untuk memesan menu.",
+                                style: TextStyle(color: Colors.grey, fontSize: 13),
+                                textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 24),
+                        ],
+                    ),
+                    actions: [
+                        SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF00197D),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text("Mengerti", style: TextStyle(color: Colors.white)),
+                            ),
+                        ),
+                    ],
+                ),
+            );
+        }
+        return;
+    }
+
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
     cartProvider.setQuantity(widget.menu, _localQuantity);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("${widget.menu.namaMenu} diperbarui di keranjang"),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 1),
-      ),
+        SnackBar(
+            content: Text("${widget.menu.namaMenu} diperbarui di keranjang"),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 1),
+        ),
     );
-  }
+}
 
   @override
   Widget build(BuildContext context) {

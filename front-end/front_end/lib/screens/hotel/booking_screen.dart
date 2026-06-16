@@ -9,6 +9,8 @@ import 'room_type_screen.dart';
 import 'waiting_payment_screen.dart';
 import '../event/event_header.dart';
 import '../../notification/notification_service.dart';
+import '../event/app_theme.dart';
+import 'package:flutter/services.dart';
 
 class BookingScreen extends StatefulWidget {
   final RoomType room;
@@ -28,33 +30,76 @@ class _BookingScreenState extends State<BookingScreen> {
 
   double _discountAmount = 0;
   String _appliedPromoName = "";
+  int? _appliedPromoId; // ← simpan promo_id dari response backend
   String _selectedPayment = "Transfer Bank";
   bool _isLoading = false;
+  String _nikErrorMessage = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _guestNikController.addListener(_validateNIK);
+  }
+
+  @override
+  void dispose() {
+    _guestNikController.removeListener(_validateNIK);
+    _guestNameController.dispose();
+    _guestNikController.dispose();
+    _guestCountController.dispose();
+    _promoController.dispose();
+    super.dispose();
+  }
+
+  void _validateNIK() {
+    setState(() {
+      if (_guestNikController.text.isEmpty) {
+        _nikErrorMessage = "";
+      } else if (_guestNikController.text.length < 16) {
+        _nikErrorMessage = "NIK harus 16 karakter (${_guestNikController.text.length}/16)";
+      } else {
+        _nikErrorMessage = "";
+      }
+    });
+  }
 
   int _calculateNights() {
     if (_checkInDate == null || _checkOutDate == null) return 0;
-    int days = _checkOutDate!.difference(_checkInDate!).inDays;
-    return days < 1 ? 1 : days;
+    return _checkOutDate!.difference(_checkInDate!).inDays;
   }
+
+  double _getSubtotal() => _calculateNights() * widget.room.hargaAkhir;
 
   void _handleCheckPromo() async {
     if (_promoController.text.isEmpty) return;
-    final result = await ApiServices.checkPromoCode(_promoController.text, 'hotel');
+
+    final prefs = await SharedPreferences.getInstance();
+    int userId = prefs.getInt('user_id') ?? 0;
+
+    if (userId == 0) {
+      _showSnackBar("Silakan login terlebih dahulu", Colors.red);
+      return;
+    }
+
+    final result = await ApiServices.checkPromoCode(
+      _promoController.text,
+      'hotel',
+      userId: userId,
+      totalHarga: _getSubtotal(), // kirim subtotal, backend yang hitung potongan
+    );
+
     if (result['success'] == true) {
       setState(() {
+        _appliedPromoId   = result['data']['promo_id'];
         _appliedPromoName = result['data']['nama_promo'];
-        double potongan = double.parse(result['data']['nominal_potongan'].toString());
-        if (result['data']['tipe_diskon'] == 'persen') {
-          double currentTotal = _calculateNights() * widget.room.hargaAkhir;
-          _discountAmount = currentTotal * (potongan / 100);
-        } else {
-          _discountAmount = potongan;
-        }
+        // Pakai potongan_dihitung dari backend — fix bug voucher nominal > total harga
+        _discountAmount   = double.parse(result['data']['potongan_dihitung'].toString());
       });
       _showSnackBar("Promo Berhasil Dipasang!", Colors.green);
     } else {
       setState(() {
-        _discountAmount = 0;
+        _appliedPromoId   = null;
+        _discountAmount   = 0;
         _appliedPromoName = "";
       });
       _showSnackBar(result['message'] ?? "Promo tidak valid", Colors.red);
@@ -62,30 +107,93 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   void _handleBooking() async {
-    if (_checkInDate == null || _guestNameController.text.isEmpty || _guestNikController.text.isEmpty) {
+    if (_checkInDate == null) {
+      _showSnackBar("Harap pilih tanggal check-in!", Colors.red);
+      return;
+    }
+
+    DateTime tomorrow     = DateTime.now().add(const Duration(days: 1));
+    DateTime checkInDate  = DateTime(_checkInDate!.year, _checkInDate!.month, _checkInDate!.day);
+    DateTime tomorrowDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+
+    if (checkInDate.isBefore(tomorrowDate)) {
+      _showSnackBar("Booking minimal H+1 hari. Silakan pilih tanggal mulai besok atau lebih.", Colors.red);
+      return;
+    }
+
+    if (_guestNikController.text.length != 16) {
+      _showSnackBar("NIK harus tepat 16 karakter", Colors.red);
+      return;
+    }
+
+    final prefs   = await SharedPreferences.getInstance();
+    int? userId   = prefs.getInt('user_id');
+
+    if (userId == null || userId == 0) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
+                child: Icon(Icons.lock_outline_rounded, color: Colors.red.shade400, size: 40),
+              ),
+              const SizedBox(height: 16),
+              const Text("Login Diperlukan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16), textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              const Text("Silakan login terlebih dahulu untuk melakukan reservasi kamar.", style: TextStyle(color: Colors.grey, fontSize: 13), textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+            ],
+          ),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryBlue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Mengerti", style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (_guestNameController.text.isEmpty || _guestNikController.text.isEmpty) {
       _showSnackBar("Harap isi semua data!", Colors.red);
       return;
     }
+
     setState(() => _isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
-    int? userId = prefs.getInt('user_id');
     String? realFcmToken = await PushNotificationService.getDeviceToken();
-    double finalTotal = (_calculateNights() * widget.room.hargaAkhir) - _discountAmount;
+
     Map<String, dynamic> data = {
-      "user_id": userId ?? 0,
-      "fcm_token": realFcmToken ?? "",
-      "tipe_kamar_id": widget.room.id,
-      "tgl_checkin": DateFormat('yyyy-MM-dd').format(_checkInDate!),
-      "tgl_checkout": DateFormat('yyyy-MM-dd').format(_checkOutDate!),
-      "total_malam": _calculateNights(),
-      "total_harga": finalTotal,
+      "user_id"          : userId,
+      "fcm_token"        : realFcmToken ?? "",
+      "tipe_kamar_id"    : widget.room.id,
+      "tgl_checkin"      : DateFormat('yyyy-MM-dd').format(_checkInDate!),
+      "tgl_checkout"     : DateFormat('yyyy-MM-dd').format(_checkOutDate!),
+      "total_malam"      : _calculateNights(),
+      "total_harga"      : _getSubtotal(), // ← kirim SUBTOTAL sebelum diskon, backend yang potong
       "metode_pembayaran": _selectedPayment,
-      "nama_tamu": _guestNameController.text,
-      "nik_identitas": _guestNikController.text,
-      "jumlah_tamu": int.parse(_guestCountController.text),
+      "nama_tamu"        : _guestNameController.text,
+      "nik_identitas"    : _guestNikController.text,
+      "jumlah_tamu"      : int.parse(_guestCountController.text),
+      "promo_id"         : _appliedPromoId, // ← null jika tidak ada promo
     };
+
     final result = await ApiServices.storeReservation(data);
     setState(() => _isLoading = false);
+
     if (result['success'] == true) {
       if (_selectedPayment != "Bayar di Kasir") {
         String? redirectUrl = result['redirect_url'];
@@ -121,17 +229,19 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   void _showSnackBar(String msg, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: color, behavior: SnackBarBehavior.floating));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: color, behavior: SnackBarBehavior.floating),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final eventProvider = context.watch<EventProvider>();
-    final primaryColor = eventProvider.primaryColor;
+    final eventProvider  = context.watch<EventProvider>();
+    final primaryColor   = eventProvider.primaryColor;
     final secondaryColor = eventProvider.secondaryColor;
 
-    int nights = _calculateNights();
-    double subTotal = nights * widget.room.hargaAkhir;
+    int nights       = _calculateNights();
+    double subTotal  = _getSubtotal();
     double totalBayar = subTotal - _discountAmount;
 
     return Scaffold(
@@ -168,7 +278,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   const SizedBox(height: 10),
                   _buildTextField(_guestNameController, "Nama Sesuai KTP", Icons.person, primaryColor),
                   const SizedBox(height: 10),
-                  _buildTextField(_guestNikController, "NIK / KTP", Icons.badge, primaryColor),
+                  _buildTextFieldNIK(_guestNikController, "NIK / KTP", Icons.badge, primaryColor),
                   const SizedBox(height: 20),
 
                   _buildSectionTitle("Jadwal Menginap", primaryColor),
@@ -182,13 +292,13 @@ class _BookingScreenState extends State<BookingScreen> {
                         _checkInDate == null
                             ? "Klik untuk Pilih Tanggal"
                             : "${DateFormat('dd MMM').format(_checkInDate!)} - ${DateFormat('dd MMM yyyy').format(_checkOutDate!)}",
-                        style: TextStyle(fontWeight: FontWeight.w500),
+                        style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                       trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                       onTap: () async {
                         DateTimeRange? picked = await showDateRangePicker(
                           context: context,
-                          firstDate: DateTime.now(),
+                          firstDate: DateTime.now().add(const Duration(days: 1)),
                           lastDate: DateTime.now().add(const Duration(days: 365)),
                           builder: (context, child) {
                             return Theme(
@@ -199,10 +309,56 @@ class _BookingScreenState extends State<BookingScreen> {
                             );
                           },
                         );
+
                         if (picked != null) {
+                          if (!picked.end.isAfter(picked.start)) {
+                            if (mounted) {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(color: Colors.orange.shade50, shape: BoxShape.circle),
+                                        child: Icon(Icons.warning_amber_rounded, color: Colors.orange.shade400, size: 40),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text("Tanggal Tidak Valid", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16), textAlign: TextAlign.center),
+                                      const SizedBox(height: 8),
+                                      const Text("Reservasi minimal harus 1 malam. Silakan pilih tanggal check-out setelah tanggal check-in.", style: TextStyle(color: Colors.grey, fontSize: 13), textAlign: TextAlign.center),
+                                      const SizedBox(height: 24),
+                                    ],
+                                  ),
+                                  actions: [
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: primaryColor,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text("Mengerti", style: TextStyle(color: Colors.white)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            return;
+                          }
                           setState(() {
-                            _checkInDate = picked.start;
+                            _checkInDate  = picked.start;
                             _checkOutDate = picked.end;
+                            // Reset promo saat tanggal berubah karena subtotal berubah
+                            _appliedPromoId   = null;
+                            _discountAmount   = 0;
+                            _appliedPromoName = "";
+                            _promoController.clear();
                           });
                         }
                       },
@@ -268,6 +424,32 @@ class _BookingScreenState extends State<BookingScreen> {
                       ),
                     ],
                   ),
+                  // Tampilkan nama promo jika sudah terpasang
+                  if (_appliedPromoName.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            _appliedPromoName,
+                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          const Spacer(),
+                          // Tombol hapus promo
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              _appliedPromoId   = null;
+                              _discountAmount   = 0;
+                              _appliedPromoName = "";
+                              _promoController.clear();
+                            }),
+                            child: const Icon(Icons.close, color: Colors.red, size: 16),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 30),
 
                   _buildSectionTitle("Rincian Biaya", primaryColor),
@@ -344,6 +526,60 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  Widget _buildTextFieldNIK(TextEditingController controller, String label, IconData icon, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(16),
+          ],
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon, color: color),
+            suffixText: '${controller.text.length}/16',
+            suffixStyle: TextStyle(
+              color: controller.text.length == 16 ? Colors.green : Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: controller.text.length == 16 ? Colors.green : Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(
+                color: controller.text.length == 16 ? Colors.green : Colors.grey.shade200,
+                width: controller.text.length == 16 ? 2 : 1,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: color, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+        if (_nikErrorMessage.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 16),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 16, color: Colors.red),
+                const SizedBox(width: 8),
+                Text(_nikErrorMessage, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildPriceRow(String label, String value, {bool isBold = false, Color color = Colors.black, double fontSize = 14}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -353,11 +589,7 @@ class _BookingScreenState extends State<BookingScreen> {
           Text(label, style: TextStyle(color: Colors.grey.shade700, fontSize: fontSize * 0.85)),
           Text(
             value,
-            style: TextStyle(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-              fontSize: fontSize,
-              color: color,
-            ),
+            style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.w600, fontSize: fontSize, color: color),
           ),
         ],
       ),

@@ -146,7 +146,7 @@ class _ReservationDetailScreenState extends State<ReservationDetailScreen> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Hapus Ulasan?"),
-        content: const Text("Ulasan Anda akan dihapus secara permanen."),
+        content: const Text("Anda yakin ingin menghapus ulasan ini?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Batal")),
           TextButton(

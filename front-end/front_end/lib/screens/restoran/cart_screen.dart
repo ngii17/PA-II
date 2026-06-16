@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../services/api_services.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/event_provider.dart';
 import 'checkout_screen.dart';
@@ -264,9 +265,22 @@ class _CartItemCard extends StatelessWidget {
     required this.onAdd,
   });
 
+  String _processImageUrl(String? imageUrl) {
+    String finalImageUrl = imageUrl ?? "";
+    
+    if (finalImageUrl.contains(RegExp(r'\d+\.\d+\.\d+\.\d+'))) {
+      finalImageUrl = finalImageUrl.replaceAll(RegExp(r'\d+\.\d+\.\d+\.\d+'), ApiServices.ipAddress);
+    } else if (finalImageUrl.isNotEmpty && !finalImageUrl.startsWith('http')) {
+      finalImageUrl = "http://${ApiServices.ipAddress}:8001/storage/$finalImageUrl";
+    }
+    
+    return finalImageUrl;
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool hasPromo = menu.promoAktif != null && (menu.hargaAkhir < menu.hargaAsli);
+    final String processedImageUrl = _processImageUrl(menu.fotoMenu);
     
     return Card(
       elevation: 2,
@@ -279,7 +293,7 @@ class _CartItemCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                menu.fotoMenu ?? "",
+                processedImageUrl,
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,

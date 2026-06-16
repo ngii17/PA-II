@@ -8,6 +8,9 @@ import '../../providers/event_provider.dart';
 import '../../widgets/splash_widgets.dart';
 
 class PremiumSplashScreen extends StatefulWidget {
+
+  static const String ipAddress = "10.139.124.132"; 
+  
   final VoidCallback? onFinished; // Callback saat animasi selesai
 
   const PremiumSplashScreen({super.key, this.onFinished});

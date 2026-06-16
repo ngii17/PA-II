@@ -8,6 +8,7 @@ import 'menu_detail_screen.dart';
 import 'cart_screen.dart';
 import '../event/event_header.dart';
 import '../notification/notification_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _AppColors {
   static const Color navyDark  = Color(0xFF0C2D6B);
@@ -671,24 +672,81 @@ class _MenuCard extends StatelessWidget {
                           ],
                         ),
                         GestureDetector(
-                          onTap: () {
-                            cartProvider.addToCart(menu);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("${menu.namaMenu} ditambahkan ke keranjang"),
-                                duration: const Duration(seconds: 1),
-                                backgroundColor: primaryColor,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(20)),
-                            child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 13), SizedBox(width: 3), Text("Pesan", style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold))]),
-                          ),
+    onTap: () async {
+        // TAMBAHKAN PENGECEKAN GUEST ↓
+        final prefs = await SharedPreferences.getInstance();
+        int? userId = prefs.getInt('user_id');
+
+        if (userId == null || userId == 0) {
+            if (context.mounted) {
+                showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                        content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                                Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.lock_outline_rounded, color: Colors.red.shade400, size: 40),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                    "Login Diperlukan",
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                    "Silakan login terlebih dahulu untuk memesan menu.",
+                                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                                    textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 24),
+                            ],
                         ),
+                        actions: [
+                            SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF00197D),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text("Mengerti", style: TextStyle(color: Colors.white)),
+                                ),
+                            ),
+                        ],
+                    ),
+                );
+            }
+            return;
+        }
+        // SAMPAI SINI ↑
+
+        cartProvider.addToCart(menu);
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text("${menu.namaMenu} ditambahkan ke keranjang"),
+                duration: const Duration(seconds: 1),
+                backgroundColor: primaryColor,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+        );
+    },
+    child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(20)),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 13), SizedBox(width: 3), Text("Pesan", style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold))]),
+    ),
+)
                       ],
                     ),
                   ],

@@ -37,6 +37,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     });
   }
 
+  // ✅ TAMBAH: Method untuk processing URL gambar
+  String _processImageUrl(String? imageUrl) {
+    String finalImageUrl = imageUrl ?? "";
+    
+    if (finalImageUrl.contains(RegExp(r'\d+\.\d+\.\d+\.\d+'))) {
+      finalImageUrl = finalImageUrl.replaceAll(RegExp(r'\d+\.\d+\.\d+\.\d+'), ApiServices.ipAddress);
+    } else if (finalImageUrl.isNotEmpty && !finalImageUrl.startsWith('http')) {
+      finalImageUrl = "http://${ApiServices.ipAddress}:8001/storage/$finalImageUrl";
+    }
+    
+    return finalImageUrl;
+  }
+
   void _showRestoReviewDialog(BuildContext context, int menuId, String menuName,
       {bool isEdit = false, int? reviewId, Map<String, dynamic>? existingData}) {
     final TextEditingController commentController = TextEditingController(
@@ -177,8 +190,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Widget _buildTrailingWidget(Map<String, dynamic> item, bool isPaid, Color primaryColor) {
     bool isReviewed = (item['is_reviewed'] as bool?) ?? false;
 
-    // 1. Belum Lunas (Pending) -> tampilkan harga subtotal
-    if (!isPaid) {
+    // ✅ PERBAIKAN: Cek status pesanan SELESAI (id 4), bukan pembayaran
+    int statusPesananId = int.tryParse(item['status_pesanan_id'].toString()) ?? 0;
+    bool isCompleted = statusPesananId == 4; // Status SELESAI
+
+    // 1. Pesanan BELUM Selesai -> tampilkan harga subtotal
+    if (!isCompleted) {
       double subPrice = double.tryParse(item['harga_at_porsi'].toString()) ?? 0;
       int qty = int.tryParse(item['jumlah'].toString()) ?? 0;
       return Text(
@@ -211,7 +228,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
     }
 
-    // 3. Sudah Lunas DAN BELUM Diulas -> tombol ULAS (warna primary)
+    // 3. Sudah Selesai DAN BELUM Diulas -> tombol ULAS (warna primary)
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: primaryColor,
@@ -336,6 +353,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         final int qty = int.tryParse(item['jumlah'].toString()) ?? 0;
                         final String menuName = menu?['nama_menu'] ?? "Menu tidak ditemukan";
                         final String? fotoMenu = menu?['foto_menu'];
+                        // ✅ PERBAIKAN: Process URL gambar sebelum dipakai
+                        final String processedImageUrl = _processImageUrl(fotoMenu);
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -346,7 +365,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 borderRadius: BorderRadius.circular(10),
                                 child: fotoMenu != null && fotoMenu.isNotEmpty
                                     ? Image.network(
-                                        fotoMenu,
+                                        processedImageUrl,
                                         width: 50,
                                         height: 50,
                                         fit: BoxFit.cover,

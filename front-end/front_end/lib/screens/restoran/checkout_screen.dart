@@ -29,6 +29,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _promoController = TextEditingController();
   double _discount = 0;
   String _promoName = "";
+  int? _appliedPromoId; // ← simpan promo_id dari response backend
   bool _isProcessing = false;
 
   List<Map<String, dynamic>> _getCartItemsDetails() {
@@ -53,19 +54,48 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return total;
   }
 
+  String _processImageUrl(String? imageUrl) {
+    String finalImageUrl = imageUrl ?? "";
+    if (finalImageUrl.contains(RegExp(r'\d+\.\d+\.\d+\.\d+'))) {
+      finalImageUrl = finalImageUrl.replaceAll(RegExp(r'\d+\.\d+\.\d+\.\d+'), ApiServices.ipAddress);
+    } else if (finalImageUrl.isNotEmpty && !finalImageUrl.startsWith('http')) {
+      finalImageUrl = "http://${ApiServices.ipAddress}:8001/storage/$finalImageUrl";
+    }
+    return finalImageUrl;
+  }
+
   void _checkPromo() async {
-    final result = await ApiServices.checkPromoCode(_promoController.text, 'restoran');
+    if (_promoController.text.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    int userId = prefs.getInt('user_id') ?? 0;
+
+    if (userId == 0) {
+      _showSnackBar("Silakan login terlebih dahulu", Colors.red);
+      return;
+    }
+
+    final result = await ApiServices.checkPromoCode(
+      _promoController.text,
+      'restoran',
+      userId: userId,
+      totalHarga: _getSubtotal(), // kirim subtotal, backend yang hitung potongan
+    );
+
     if (result['success'] == true) {
       setState(() {
-        _promoName = result['data']['nama_promo'];
-        double pot = double.parse(result['data']['nominal_potongan'].toString());
-        _discount = (result['data']['tipe_diskon'] == 'persen')
-            ? (_getSubtotal() * (pot / 100))
-            : pot;
+        _appliedPromoId = result['data']['promo_id'];
+        _promoName      = result['data']['nama_promo'];
+        // Pakai potongan_dihitung dari backend — fix bug voucher nominal > total harga
+        _discount       = double.parse(result['data']['potongan_dihitung'].toString());
       });
       _showSnackBar("Promo berhasil dipasang!", Colors.green);
     } else {
-      setState(() { _discount = 0; _promoName = ""; });
+      setState(() {
+        _appliedPromoId = null;
+        _discount       = 0;
+        _promoName      = "";
+      });
       _showSnackBar(result['message'] ?? "Kode promo tidak valid", Colors.red);
     }
   }
@@ -92,13 +122,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       widget.cart.forEach((id, qty) => items.add({"menu_id": id, "jumlah": qty}));
 
       final result = await ApiServices.placeRestaurantOrder({
-        "user_id": userId ?? 1,
-        "fcm_token": fcmToken,
+        "user_id"          : userId ?? 1,
+        "fcm_token"        : fcmToken,
         "metode_pembayaran": _paymentMethod,
-        "total_harga": _getSubtotal() - _discount,
-        "tipe_pengantaran": _deliveryType,
-        "nomor_lokasi": _locationController.text,
-        "items": items
+        "total_harga"      : _getSubtotal(), // ← kirim SUBTOTAL sebelum diskon, backend yang potong
+        "tipe_pengantaran" : _deliveryType,
+        "nomor_lokasi"     : _locationController.text,
+        "items"            : items,
+        "promo_id"         : _appliedPromoId, // ← null jika tidak ada promo
       });
 
       if (result['success'] == true) {
@@ -178,7 +209,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         leading: _PurnamaLogo(),
         actions: [
-          // Cart icon dengan badge
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -232,21 +262,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     itemBuilder: (context, index) {
                       final item = cartItems[index];
                       final MenuResto menu = item['menu'];
+                      final String processedImageUrl = _processImageUrl(menu.fotoMenu);
+
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: Image.network(
-                            menu.fotoMenu ?? "",
+                            processedImageUrl,
                             width: 50,
                             height: 50,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(width: 50, height: 50, color: Colors.grey[200], child: const Icon(Icons.fastfood)),
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 50,
+                              height: 50,
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.fastfood),
+                            ),
                           ),
                         ),
                         title: Text(menu.namaMenu, style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Text("${item['qty']} x Rp ${menu.hargaAkhir.toStringAsFixed(0)}"),
-                        trailing: Text("Rp ${item['total'].toStringAsFixed(0)}", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold)),
+                        trailing: Text(
+                          "Rp ${item['total'].toStringAsFixed(0)}",
+                          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                        ),
                       );
                     },
                   ),
@@ -285,7 +325,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       hintText: "Contoh: 05",
                       prefixIcon: Icon(_deliveryType == "Meja" ? Icons.table_restaurant : Icons.bed),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: primaryColor)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: primaryColor),
+                      ),
                       filled: true,
                       fillColor: Colors.white,
                     ),
@@ -307,7 +350,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         items: [
                           "Transfer Bank",
                           "E-Wallet",
-                          if (_deliveryType == "Meja") "Bayar di Kasir"
+                          if (_deliveryType == "Meja") "Bayar di Kasir",
                         ].map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 14)))).toList(),
                         onChanged: (v) => setState(() => _paymentMethod = v!),
                         dropdownColor: Colors.white,
@@ -350,20 +393,54 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ],
                   ),
+                  // Tampilkan nama promo jika sudah terpasang
+                  if (_promoName.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            _promoName,
+                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          const Spacer(),
+                          // Tombol hapus promo
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              _appliedPromoId = null;
+                              _discount = 0;
+                              _promoName = "";
+                              _promoController.clear();
+                            }),
+                            child: const Icon(Icons.close, color: Colors.red, size: 16),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 30),
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+                      ],
                     ),
                     child: Column(
                       children: [
                         _buildPriceRow("Subtotal", "Rp ${subtotal.toStringAsFixed(0)}"),
-                        if (_discount > 0) _buildPriceRow("Potongan Promo", "- Rp ${_discount.toStringAsFixed(0)}", color: Colors.red),
+                        if (_discount > 0)
+                          _buildPriceRow("Potongan Promo", "- Rp ${_discount.toStringAsFixed(0)}", color: Colors.red),
                         const Divider(height: 30),
-                        _buildPriceRow("Total Bayar", "Rp ${grandTotal.toStringAsFixed(0)}", isBold: true, color: primaryColor),
+                        _buildPriceRow(
+                          "Total Bayar",
+                          "Rp ${grandTotal.toStringAsFixed(0)}",
+                          isBold: true,
+                          color: primaryColor,
+                        ),
                       ],
                     ),
                   ),
@@ -400,15 +477,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: Colors.grey.shade700)),
-          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.w600, fontSize: isBold ? 20 : 14, color: color)),
+          Text(
+            label,
+            style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: Colors.grey.shade700),
+          ),
+          Text(
+            value,
+            style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.w600, fontSize: isBold ? 20 : 14, color: color),
+          ),
         ],
       ),
     );
   }
 }
 
-// Widget logo yang sama seperti di MenuListScreen
 class _PurnamaLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -433,11 +515,7 @@ class _PurnamaLogo extends StatelessWidget {
           child: const Center(
             child: Text(
               "P",
-              style: TextStyle(
-                color: Color(0xFFC9A227),
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Color(0xFFC9A227), fontWeight: FontWeight.w900, fontSize: 16),
             ),
           ),
         ),

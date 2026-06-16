@@ -7,7 +7,7 @@ import 'room_detail_screen.dart';
 import 'booking_screen.dart';
 import '../event/event_header.dart';
 import '../notification/notification_screen.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 // ─────────────────────────────────────────────
 //  WARNA (konsisten dengan home_screen.dart)
 // ─────────────────────────────────────────────
@@ -459,7 +459,7 @@ class _RoomCard extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       Image.network(
-                        "https://plus.unsplash.com/premium_photo-1675745329954-9639d3b74bbf?q=80&w=600&auto=format&fit=crop",
+                        room.foto ?? '',
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: const Color(0xFFF3F4F6),
@@ -554,16 +554,34 @@ class _RoomCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  flex: 2,
-                  child: GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BookingScreen(room: room))),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.85)]), borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 3))]),
-                      child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.calendar_month_rounded, size: 14, color: Colors.white), SizedBox(width: 5), Text("Book Now", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))]),
-                    ),
-                  ),
-                ),
+    flex: 2,
+    child: GestureDetector(
+        onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            int? userId = prefs.getInt('user_id');
+            if (userId == null || userId == 0) {
+                if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text("Silakan login terlebih dahulu untuk melakukan reservasi kamar."),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                        ),
+                    );
+                }
+                return;
+            }
+            if (context.mounted) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => BookingScreen(room: room)));
+            }
+        },
+        child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.85)]), borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 3))]),
+            child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.calendar_month_rounded, size: 14, color: Colors.white), SizedBox(width: 5), Text("Book Now", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))]),
+        ),
+    ),
+),
               ],
             ),
           ),
