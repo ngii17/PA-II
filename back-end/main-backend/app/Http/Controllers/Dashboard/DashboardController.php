@@ -42,6 +42,16 @@ class DashboardController extends Controller
             $data['total_promo']    = Promo::count();
             $data['total_ulasan']   = UlasanHotel::count() + UlasanRestoran::count();
 
+            // --- TAMBAHAN: Data untuk widget "Ulasan Terbaru" ---
+            $ulasanHotelTerbaru = UlasanHotel::latest()->take(10)->get();
+            $ulasanRestoTerbaru = UlasanRestoran::latest()->take(10)->get();
+
+            $data['ulasan'] = $ulasanHotelTerbaru->concat($ulasanRestoTerbaru)
+                ->sortByDesc('created_at')
+                ->take(5)
+                ->values();
+            // --- AKHIR TAMBAHAN ---
+
             // Status yang dianggap SAH sebagai uang masuk
             $statusLunasHotel = [2, 3, 4]; // Terbayar, Check-in, Selesai
             $statusLunasResto = [2];       // Lunas

@@ -47,3 +47,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Port 8000 - api.php
     Route::post('/internal/create-staff', [App\Http\Controllers\Api\AuthController::class, 'storeStaff']);
 });
+
+// routes/api.php di auth-service
+Route::middleware('auth:sanctum')->get('/auth/me', function (Request $request) {
+    return response()->json([
+        'success' => true,
+        'user_id' => request()->user()->id
+    ]);
+});

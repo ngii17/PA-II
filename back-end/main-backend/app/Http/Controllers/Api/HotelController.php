@@ -17,6 +17,7 @@ use Midtrans\Config;
 use Midtrans\Snap;
 use Illuminate\Support\Facades\Log; // <--- SUDAH BENAR
 use Illuminate\Support\Facades\Storage;
+use App\Helpers\AuthServiceHelper;
 
 
 class HotelController extends Controller
@@ -99,8 +100,31 @@ class HotelController extends Controller
      */
     public function storeReservation(Request $request)
     {
+        // =============================================
+        // STEP 1: AMBIL USER_ID DARI TOKEN (BUKAN DARI REQUEST BODY)
+        // =============================================
+        $token = $request->bearerToken();
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token tidak ditemukan'
+            ], 401);
+        }
+
+        $userId = AuthServiceHelper::getUserIdFromToken($token);
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token tidak valid atau expired'
+            ], 401);
+        }
+
+        // =============================================
+        // STEP 2: VALIDASI INPUT (user_id DIHAPUS dari sini)
+        // =============================================
         $validator = Validator::make($request->all(), [
-            'user_id'           => 'required',
             'fcm_token'         => 'nullable|string',
             'tipe_kamar_id'     => 'required|exists:tipe_kamar,id',
             'tgl_checkin'       => 'required|date|after_or_equal:today',
@@ -111,7 +135,6 @@ class HotelController extends Controller
             'nama_tamu'         => 'required|string',
             'nik_identitas'     => 'required|string',
             'jumlah_tamu'       => 'required|integer',
-            // promo bersifat opsional
             'promo_id'          => 'nullable|integer|exists:promo,id',
         ]);
 
@@ -119,6 +142,9 @@ class HotelController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
+        // =============================================
+        // STEP 3: CEK KETERSEDIAAN KAMAR
+        // =============================================
         $tipeId = $request->tipe_kamar_id;
         $tglIn  = $request->tgl_checkin;
         $tglOut = $request->tgl_checkout;
@@ -129,7 +155,7 @@ class HotelController extends Controller
             ->whereIn('status_reservasi_id', [1, 2])
             ->where(function ($query) use ($tglIn, $tglOut) {
                 $query->where('tgl_checkin', '<', $tglOut)
-                      ->where('tgl_checkout', '>', $tglIn);
+                    ->where('tgl_checkout', '>', $tglIn);
             })->count();
 
         if ($terbooking >= $totalUnitTersedia) {
@@ -139,6 +165,9 @@ class HotelController extends Controller
             ], 400);
         }
 
+        // =============================================
+        // STEP 4: PROSES RESERVASI
+        // =============================================
         DB::beginTransaction();
         try {
             // --- HITUNG ULANG POTONGAN PROMO DI BACKEND ---
@@ -150,24 +179,22 @@ class HotelController extends Controller
                 $promo = \App\Models\Hotel\Promo::find($promoId);
 
                 if ($promo) {
-                    // Validasi ulang promo masih aktif & belum dipakai user ini
                     $masihAktif = $promo->is_active
                         && now()->between($promo->tgl_mulai, $promo->tgl_selesai)
                         && in_array($promo->kategori, ['hotel', 'semua']);
 
+                    // PAKAI $userId DARI TOKEN, BUKAN $request->user_id
                     $sudahDipakai = \App\Models\promo\PromoUsage::where('promo_id', $promoId)
-                        ->where('user_id', $request->user_id)
+                        ->where('user_id', $userId)
                         ->exists();
 
                     if ($masihAktif && !$sudahDipakai) {
                         if ($promo->tipe_diskon === 'persen') {
                             $potonganPromo = $subtotal * ($promo->nominal_potongan / 100);
                         } else {
-                            // Voucher nominal > total harga → bayar Rp 0, tidak minus
                             $potonganPromo = min((float) $promo->nominal_potongan, $subtotal);
                         }
                     } else {
-                        // Promo tidak valid / sudah dipakai → abaikan, lanjut tanpa diskon
                         $promoId = null;
                     }
                 }
@@ -175,15 +202,15 @@ class HotelController extends Controller
 
             $totalBayar = max($subtotal - $potonganPromo, 0);
 
-            // --- SIMPAN RESERVASI ---
+            // --- SIMPAN RESERVASI (PAKAI $userId DARI TOKEN) ---
             $reservasi = Reservasi::create([
-                'user_id'             => $request->user_id,
+                'user_id'             => $userId, // ← DARI TOKEN
                 'fcm_token'           => $request->fcm_token,
                 'tipe_kamar_id'       => $request->tipe_kamar_id,
                 'tgl_checkin'         => $request->tgl_checkin,
                 'tgl_checkout'        => $request->tgl_checkout,
                 'total_malam'         => $request->total_malam,
-                'total_harga'         => $totalBayar,   // total setelah diskon
+                'total_harga'         => $totalBayar,
                 'metode_pembayaran'   => $request->metode_pembayaran,
                 'status_reservasi_id' => 1,
             ]);
@@ -195,12 +222,12 @@ class HotelController extends Controller
                 'jumlah_tamu'   => $request->jumlah_tamu,
             ]);
 
-            // --- CATAT PENGGUNAAN PROMO (1 user 1 kali) ---
+            // --- CATAT PENGGUNAAN PROMO (PAKAI $userId DARI TOKEN) ---
             if ($promoId) {
                 \App\Models\promo\PromoUsage::firstOrCreate(
                     [
                         'promo_id' => $promoId,
-                        'user_id'  => $request->user_id,
+                        'user_id'  => $userId, // ← DARI TOKEN
                     ],
                     [
                         'kategori' => 'hotel',
@@ -263,11 +290,30 @@ class HotelController extends Controller
      * 3. AMBIL RIWAYAT RESERVASI
      * Logika: Cek ulasan berdasarkan ID Reservasi unik
      */
+
     public function getReservationHistory(Request $request)
     {
-        $userId = $request->query('user_id');
-        if (!$userId) return response()->json(['success' => false], 400);
+        // Ambil token dari header Authorization
+        $token = $request->bearerToken();
 
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token tidak ditemukan'
+            ], 401);
+        }
+
+        // Introspect ke auth-service untuk dapat user_id
+        $userId = AuthServiceHelper::getUserIdFromToken($token);
+
+        if (!$userId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token tidak valid atau expired'
+            ], 401);
+        }
+
+        // Mulai sini sama seperti sebelumnya, tapi user_id dari token, BUKAN dari query param
         try {
             $history = \App\Models\hotel\Reservasi::with(['details', 'tipeKamar'])
                 ->where('user_id', $userId)
@@ -275,12 +321,11 @@ class HotelController extends Controller
                 ->get();
 
             $data = $history->map(function ($res) {
-                // CARI ULASAN BERDASARKAN ID RESERVASI
                 $review = \App\Models\hotel\UlasanHotel::where('reservasi_id', $res->id)->first();
 
                 return [
                     'id'                  => $res->id,
-                    'tipe_kamar_id'       => $res->tipe_kamar_id, 
+                    'tipe_kamar_id'       => $res->tipe_kamar_id,
                     'status_reservasi_id' => $res->status_reservasi_id,
                     'tgl_checkin'         => $res->tgl_checkin,
                     'total_harga'         => $res->total_harga,
@@ -289,18 +334,21 @@ class HotelController extends Controller
                     'details'             => $res->details,
                     'is_reviewed'         => $review ? true : false,
                     'review_id'           => $review ? $review->id : null,
-                    // PASTIKAN KEY INI ADA DAN NAMANYA 'existing_review'
                     'existing_review'     => $review ? [
                         'rating'       => $review->rating,
                         'komentar'     => $review->komentar,
-                        'is_anonymous' => (bool)$review->is_anonymous
+                        'is_anonymous' => (bool) $review->is_anonymous
                     ] : null,
                 ];
             });
 
             return response()->json(['success' => true, 'data' => $data]);
+
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
         /**

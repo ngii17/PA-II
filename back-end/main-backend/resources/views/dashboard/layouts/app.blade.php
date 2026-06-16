@@ -506,7 +506,6 @@
                  MENU KHUSUS ADMIN
             ============================================ --}}
             @if(session('user.role') === 'admin')
-                <span class="nav-section-label">Admin Control</span>
 
                 <a href="{{ route('dashboard.pengguna') }}"
                    class="nav-item {{ request()->routeIs('dashboard.pengguna') ? 'active' : '' }}">
@@ -555,7 +554,6 @@
                  MENU KHUSUS STAFF HOTEL
             ============================================ --}}
             @if(session('user.role') === 'staff_hotel')
-                <span class="nav-section-label">Hotel Management</span>
 
                 <a href="{{ route('dashboard.hotel.kamar.index') }}"
                    class="nav-item {{ request()->routeIs('dashboard.hotel.kamar*') ? 'active' : '' }}">
@@ -592,7 +590,6 @@
                  MENU KHUSUS STAFF RESTORAN
             ============================================ --}}
             @if(session('user.role') === 'staff_restoran')
-                <span class="nav-section-label">Restoran Management</span>
 
                 <a href="{{ route('dashboard.restoran.kategori.index') }}"
                    class="nav-item {{ request()->routeIs('dashboard.restoran.kategori*') ? 'active' : '' }}">
