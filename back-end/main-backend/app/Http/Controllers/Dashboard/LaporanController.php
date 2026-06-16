@@ -122,7 +122,7 @@ class LaporanController extends Controller
         $users = collect();
         try {
             $token = session('user.token');
-            $baseUrl = env('MIKRO_URL', 'http://127.0.0.1:8000');
+            $baseUrl = env('MIKRO_URL');
             $response = Http::timeout(5)->withToken($token)->get($baseUrl . '/api/internal/user-tokens');
             if ($response->successful()) {
                 $users = collect($response->json('data'))->keyBy('user_id');
@@ -134,8 +134,14 @@ class LaporanController extends Controller
         $totalPesanan = $pesanan->count();
         $totalPendapatan = $pesanan->sum('total_harga');
 
+        // ✅ TAMBAHKAN INI — variabel yang diminta blade
+        $pesananLunas = $pesanan->count(); // semua yang lolos filter status_pembayaran_id=2 memang sudah lunas
+        $pesananPending = PesananMenu::where('status_pembayaran_id', 1)->count();
+        $totalPendapatan = $pesanan->sum('total_harga');
+
         $pdf = PDF::loadView('dashboard.laporan.pdf-restoran', compact(
-            'pesanan', 'users', 'totalPesanan', 'totalPendapatan'
+            'pesanan', 'users', 'totalPesanan', 'totalPendapatan',
+            'pesananLunas', 'pesananPending' // ✅ tambahkan di sini
         ));
 
         return $pdf->download('laporan-restoran-purnama.pdf');
