@@ -38,10 +38,10 @@ class _UnifiedHistoryScreenState extends State<UnifiedHistoryScreen>
       backgroundColor: const Color(0xFFF8F9FA),
       body: Column(
         children: [
-          // Header gradien dinamis dengan logo gambar
+          // ── HEADER GRADIENT DENGAN LOGO ──
           Container(
             width: double.infinity,
-            padding: EdgeInsets.only(top: topPadding + 20, bottom: 20),
+            padding: EdgeInsets.only(top: topPadding + 16, bottom: 20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -49,22 +49,61 @@ class _UnifiedHistoryScreenState extends State<UnifiedHistoryScreen>
                 colors: [primaryColor, secondaryColor.withOpacity(0.85)],
               ),
               borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(50),
-                bottomRight: Radius.circular(50),
+                bottomLeft: Radius.circular(40),
+                bottomRight: Radius.circular(40),
               ),
               boxShadow: [
-                BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8)),
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
               ],
             ),
             child: Column(
               children: [
-                Image.asset(
-                  'assets/icons/icon-purnama.png',
-                  width: 45,
-                  height: 45,
-                  errorBuilder: (c, e, s) => const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 35),
+                // ── BACK BUTTON ──
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    ),
+                    const Spacer(),
+                  ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
+                // ── LOGO ──
+                Container(
+                  width: 56,
+                  height: 56,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Image.asset(
+                      'assets/icons/icon-purnama.png',
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.white.withOpacity(0.1),
+                          child: const Icon(
+                            Icons.receipt_long_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 const Text(
                   "RIWAYAT TRANSAKSI",
                   style: TextStyle(
@@ -74,14 +113,27 @@ class _UnifiedHistoryScreenState extends State<UnifiedHistoryScreen>
                     letterSpacing: 2,
                   ),
                 ),
-                const SizedBox(height: 20),
-                // Tab Bar dengan gaya pill dinamis
+                const SizedBox(height: 6),
+                Text(
+                  "Lihat riwayat pemesanan hotel & restoran",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                // ── TAB BAR ──
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 40),
-                  height: 48,
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  height: 46,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
                   ),
                   child: TabBar(
                     controller: _tabController,
@@ -90,32 +142,68 @@ class _UnifiedHistoryScreenState extends State<UnifiedHistoryScreen>
                     indicatorPadding: const EdgeInsets.all(4),
                     indicator: BoxDecoration(
                       color: secondaryColor,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: secondaryColor.withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    labelColor: secondaryColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                    labelColor: Colors.white,
                     unselectedLabelColor: Colors.white70,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+                    labelStyle: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
                     tabs: const [
-                      Tab(text: "HOTEL"),
-                      Tab(text: "RESTO"),
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.hotel_rounded, size: 16),
+                            SizedBox(width: 6),
+                            Text("HOTEL"),
+                          ],
+                        ),
+                      ),
+                      Tab(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.restaurant_menu_rounded, size: 16),
+                            SizedBox(width: 6),
+                            Text("RESTO"),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ],
             ),
           ),
+          // ── TAB VIEW ──
           Expanded(
             child: TabBarView(
               controller: _tabController,
+              physics: const BouncingScrollPhysics(),
               children: const [
                 ReservationHistoryScreen(),
                 OrderHistoryScreen(),
               ],
             ),
           ),
-          const SizedBox(height: 100), // Spasi agar tidak tertutup navbar floating
         ],
       ),
+      // ── FLOATING BOTTOM SPACER ──
+      bottomNavigationBar: const SizedBox(height: 8),
     );
   }
 }

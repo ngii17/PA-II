@@ -1,8 +1,10 @@
+// screens/restoran/payment_status_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../home/home_screen.dart';
-import '../event/event_header.dart';
 import '../../providers/event_provider.dart';
+import '../notification/notification_screen.dart';
 
 class PaymentStatusScreen extends StatelessWidget {
   const PaymentStatusScreen({super.key});
@@ -12,142 +14,191 @@ class PaymentStatusScreen extends StatelessWidget {
     final eventProvider = context.watch<EventProvider>();
     final primaryColor = eventProvider.primaryColor;
     final secondaryColor = eventProvider.secondaryColor;
-    final onPrimary = primaryColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
+    final topPadding = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header gradien dinamis
+          // ── HEADER MODERN ──
           Container(
             width: double.infinity,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 50,
-              bottom: 40,
-            ),
+            padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 20, bottom: 28),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [primaryColor, secondaryColor.withOpacity(0.85)],
+                colors: [
+                  primaryColor,
+                  primaryColor.withOpacity(0.85),
+                  secondaryColor.withOpacity(0.7),
+                ],
               ),
               borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(60),
-                bottomRight: Radius.circular(60),
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
               ),
               boxShadow: [
-                BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10)),
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
               ],
             ),
             child: Column(
               children: [
-                Stack(
-                  alignment: Alignment.center,
+                Row(
                   children: [
-                    Container(
-                      width: 130,
-                      height: 130,
-                      decoration: BoxDecoration(
-                        color: onPrimary.withOpacity(0.1),
-                        shape: BoxShape.circle,
+                    // ── TOMBOL BACK ──
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
                       ),
                     ),
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: Colors.greenAccent, blurRadius: 30, spreadRadius: 2),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.check_circle_rounded,
-                        color: Color(0xFF2ECC71),
-                        size: 85,
+                    const SizedBox(width: 10),
+                    _buildPurnamaLogo(),
+                    const SizedBox(width: 10),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Hotel & Restoran",
+                            style: TextStyle(color: Colors.white60, fontSize: 9, letterSpacing: 1.2)),
+                        Text("PURNAMA BALIGE",
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                      ],
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.notifications_none_rounded, color: Colors.white70, size: 18),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 25),
-                const Text(
-                  "PEMBAYARAN BERHASIL",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  "Reservasi Anda telah dikonfirmasi",
-                  style: TextStyle(
-                    color: onPrimary.withOpacity(0.7),
-                    fontSize: 14,
-                    letterSpacing: 1,
-                    fontWeight: FontWeight.w500,
-                  ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: secondaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Pembayaran Berhasil",
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-
-          const EventHeader(),
-
+          // ── BODY (tanpa EventHeader) ──
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(25),
-                      border: Border.all(color: primaryColor.withOpacity(0.1)),
-                    ),
-                    child: Icon(
-                      Icons.receipt_long_rounded,
-                      color: primaryColor,
-                      size: 45,
-                    ),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          color: primaryColor.withOpacity(0.08),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Container(
+                        width: 70,
+                        height: 70,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.greenAccent,
+                              blurRadius: 30,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.check_circle_rounded,
+                          color: Color(0xFF2ECC71),
+                          size: 60,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
                   Text(
                     "Terima Kasih!",
                     style: TextStyle(
-                      fontSize: 26,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: primaryColor,
                       letterSpacing: 0.5,
                     ),
                   ),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 8),
                   const Text(
-                    "Konfirmasi pembayaran Anda telah kami terima secara otomatis. Silahkan cek menu 'Riwayat Reservasi' untuk melihat detail pesanan dan nomor kamar Anda.",
-                    textAlign: TextAlign.center,
+                    "Pembayaran Anda telah dikonfirmasi",
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.black54,
-                      height: 1.7,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 60),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: const Text(
+                      "Silakan cek menu 'Riwayat' untuk melihat detail pesanan dan nomor kamar Anda.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
                   SizedBox(
                     width: double.infinity,
-                    height: 58,
+                    height: 52,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
-                        foregroundColor: onPrimary,
-                        elevation: 8,
-                        shadowColor: primaryColor.withOpacity(0.5),
+                        foregroundColor: Colors.white,
+                        elevation: 4,
+                        shadowColor: primaryColor.withOpacity(0.4),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       onPressed: () {
@@ -160,9 +211,9 @@ class PaymentStatusScreen extends StatelessWidget {
                       child: const Text(
                         "KEMBALI KE BERANDA",
                         style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          letterSpacing: 1,
                         ),
                       ),
                     ),
@@ -173,6 +224,36 @@ class PaymentStatusScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // WIDGET PURNAMA LOGO
+  // ============================================================
+  Widget _buildPurnamaLogo() {
+    return Image.asset(
+      'assets/icons/icon-purnama.png',
+      width: 38,
+      height: 38,
+      errorBuilder: (_, __, ___) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
+          ),
+          border: Border.all(color: const Color(0xFFC9A227), width: 2),
+        ),
+        child: const Center(
+          child: Text(
+            "P",
+            style: TextStyle(color: Color(0xFFC9A227), fontWeight: FontWeight.w900, fontSize: 18),
+          ),
+        ),
       ),
     );
   }

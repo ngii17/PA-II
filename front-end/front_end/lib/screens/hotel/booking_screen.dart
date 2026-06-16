@@ -1,3 +1,5 @@
+// screens/hotel/booking_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,7 +12,9 @@ import 'waiting_payment_screen.dart';
 import '../event/event_header.dart';
 import '../../notification/notification_service.dart';
 import '../event/app_theme.dart';
+import '../home/promo_list_screen.dart';
 import 'package:flutter/services.dart';
+import '../notification/notification_screen.dart';
 
 class BookingScreen extends StatefulWidget {
   final RoomType room;
@@ -30,7 +34,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   double _discountAmount = 0;
   String _appliedPromoName = "";
-  int? _appliedPromoId; // ← simpan promo_id dari response backend
+  int? _appliedPromoId;
   String _selectedPayment = "Transfer Bank";
   bool _isLoading = false;
   String _nikErrorMessage = "";
@@ -85,14 +89,13 @@ class _BookingScreenState extends State<BookingScreen> {
       _promoController.text,
       'hotel',
       userId: userId,
-      totalHarga: _getSubtotal(), // kirim subtotal, backend yang hitung potongan
+      totalHarga: _getSubtotal(),
     );
 
     if (result['success'] == true) {
       setState(() {
         _appliedPromoId   = result['data']['promo_id'];
         _appliedPromoName = result['data']['nama_promo'];
-        // Pakai potongan_dihitung dari backend — fix bug voucher nominal > total harga
         _discountAmount   = double.parse(result['data']['potongan_dihitung'].toString());
       });
       _showSnackBar("Promo Berhasil Dipasang!", Colors.green);
@@ -183,12 +186,12 @@ class _BookingScreenState extends State<BookingScreen> {
       "tgl_checkin"      : DateFormat('yyyy-MM-dd').format(_checkInDate!),
       "tgl_checkout"     : DateFormat('yyyy-MM-dd').format(_checkOutDate!),
       "total_malam"      : _calculateNights(),
-      "total_harga"      : _getSubtotal(), // ← kirim SUBTOTAL sebelum diskon, backend yang potong
+      "total_harga"      : _getSubtotal(),
       "metode_pembayaran": _selectedPayment,
       "nama_tamu"        : _guestNameController.text,
       "nik_identitas"    : _guestNikController.text,
       "jumlah_tamu"      : int.parse(_guestCountController.text),
-      "promo_id"         : _appliedPromoId, // ← null jika tidak ada promo
+      "promo_id"         : _appliedPromoId,
     };
 
     final result = await ApiServices.storeReservation(data);
@@ -197,10 +200,11 @@ class _BookingScreenState extends State<BookingScreen> {
     if (result['success'] == true) {
       if (_selectedPayment != "Bayar di Kasir") {
         String? redirectUrl = result['redirect_url'];
-        if (redirectUrl != null) {
+        int? reservasiId = result['reservasi_id'];
+        if (redirectUrl != null && reservasiId != null) {
           await launchUrl(Uri.parse(redirectUrl), mode: LaunchMode.externalApplication);
           if (!mounted) return;
-          Navigator.push(context, MaterialPageRoute(builder: (context) => WaitingPaymentScreen(reservasiId: result['reservasi_id'])));
+          Navigator.push(context, MaterialPageRoute(builder: (context) => WaitingPaymentScreen(reservasiId: reservasiId)));
         }
       } else {
         _showSuccessDialog("Booking Berhasil! Silakan selesaikan pembayaran dan proses Check-in di Front Desk saat tiba di hotel.");
@@ -234,11 +238,42 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  // ============================================================
+  // WIDGET PURNAMA LOGO
+  // ============================================================
+  Widget _buildPurnamaLogo() {
+    return Image.asset(
+      'assets/icons/icon-purnama.png',
+      width: 38,
+      height: 38,
+      errorBuilder: (_, __, ___) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
+          ),
+          border: Border.all(color: const Color(0xFFC9A227), width: 2),
+        ),
+        child: const Center(
+          child: Text(
+            "P",
+            style: TextStyle(color: Color(0xFFC9A227), fontWeight: FontWeight.w900, fontSize: 18),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventProvider  = context.watch<EventProvider>();
     final primaryColor   = eventProvider.primaryColor;
     final secondaryColor = eventProvider.secondaryColor;
+    final topPadding = MediaQuery.of(context).padding.top;
 
     int nights       = _calculateNights();
     double subTotal  = _getSubtotal();
@@ -246,30 +281,101 @@ class _BookingScreenState extends State<BookingScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: const Text("Konfirmasi Pesanan", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [primaryColor, secondaryColor.withOpacity(0.85)],
+      body: Column(
+        children: [
+          // ── HEADER MODERN DENGAN TOMBOL BACK ──
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 20, bottom: 28),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  primaryColor,
+                  primaryColor.withOpacity(0.85),
+                  secondaryColor.withOpacity(0.7),
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // ── TOMBOL BACK ──
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildPurnamaLogo(),
+                    const SizedBox(width: 10),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Hotel & Restoran",
+                            style: TextStyle(color: Colors.white60, fontSize: 9, letterSpacing: 1.2)),
+                        Text("PURNAMA BALIGE",
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                      ],
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.notifications_none_rounded, color: Colors.white70, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.hotel_rounded, color: secondaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Konfirmasi Booking",
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const EventHeader(),
-            Padding(
+          const EventHeader(),
+          // ── BODY ──
+          Expanded(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,7 +460,6 @@ class _BookingScreenState extends State<BookingScreen> {
                           setState(() {
                             _checkInDate  = picked.start;
                             _checkOutDate = picked.end;
-                            // Reset promo saat tanggal berubah karena subtotal berubah
                             _appliedPromoId   = null;
                             _discountAmount   = 0;
                             _appliedPromoName = "";
@@ -390,7 +495,51 @@ class _BookingScreenState extends State<BookingScreen> {
                   ),
                   const SizedBox(height: 25),
 
-                  _buildSectionTitle("Punya Kode Voucher?", primaryColor),
+                  // ── BAGIAN PROMO DENGAN TOMBOL LIHAT PROMO ──
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          "Punya Kode Promo?",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final result = await Navigator.push<String>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PromoListScreen(
+                                kategori: 'hotel',
+                              ),
+                            ),
+                          );
+                          
+                          if (result != null && result.isNotEmpty) {
+                            setState(() {
+                              _promoController.text = result;
+                            });
+                            _handleCheckPromo();
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: secondaryColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.local_offer_rounded, color: secondaryColor, size: 16),
+                            const SizedBox(width: 4),
+                            const Text(
+                              "Lihat Promo",
+                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -424,7 +573,6 @@ class _BookingScreenState extends State<BookingScreen> {
                       ),
                     ],
                   ),
-                  // Tampilkan nama promo jika sudah terpasang
                   if (_appliedPromoName.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
@@ -437,7 +585,6 @@ class _BookingScreenState extends State<BookingScreen> {
                             style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 13),
                           ),
                           const Spacer(),
-                          // Tombol hapus promo
                           GestureDetector(
                             onTap: () => setState(() {
                               _appliedPromoId   = null;
@@ -474,11 +621,12 @@ class _BookingScreenState extends State<BookingScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 30),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),

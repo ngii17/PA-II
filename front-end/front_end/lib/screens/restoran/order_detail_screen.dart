@@ -1,9 +1,12 @@
+// screens/restoran/order_detail_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_services.dart';
 import '../../providers/event_provider.dart';
 import '../event/event_header.dart';
+import '../notification/notification_screen.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -37,7 +40,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     });
   }
 
-  // ✅ TAMBAH: Method untuk processing URL gambar
   String _processImageUrl(String? imageUrl) {
     String finalImageUrl = imageUrl ?? "";
     
@@ -185,16 +187,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   // ============================================================
-  // WIDGET TOMBOL DINAMIS (Sesuai permintaan)
+  // WIDGET TOMBOL DINAMIS
   // ============================================================
   Widget _buildTrailingWidget(Map<String, dynamic> item, bool isPaid, Color primaryColor) {
     bool isReviewed = (item['is_reviewed'] as bool?) ?? false;
 
-    // ✅ PERBAIKAN: Cek status pesanan SELESAI (id 4), bukan pembayaran
     int statusPesananId = int.tryParse(item['status_pesanan_id'].toString()) ?? 0;
-    bool isCompleted = statusPesananId == 4; // Status SELESAI
+    bool isCompleted = statusPesananId == 4;
 
-    // 1. Pesanan BELUM Selesai -> tampilkan harga subtotal
     if (!isCompleted) {
       double subPrice = double.tryParse(item['harga_at_porsi'].toString()) ?? 0;
       int qty = int.tryParse(item['jumlah'].toString()) ?? 0;
@@ -204,7 +204,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
     }
 
-    // 2. Sudah Lunas DAN SUDAH Diulas -> tombol Edit & Hapus
     if (isReviewed) {
       return Row(
         mainAxisSize: MainAxisSize.min,
@@ -228,7 +227,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
     }
 
-    // 3. Sudah Selesai DAN BELUM Diulas -> tombol ULAS (warna primary)
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: primaryColor,
@@ -240,10 +238,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  // ============================================================
+  // WIDGET PURNAMA LOGO
+  // ============================================================
+  Widget _buildPurnamaLogo() {
+    return Image.asset(
+      'assets/icons/icon-purnama.png',
+      width: 38,
+      height: 38,
+      errorBuilder: (_, __, ___) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
+          ),
+          border: Border.all(color: const Color(0xFFC9A227), width: 2),
+        ),
+        child: const Center(
+          child: Text(
+            "P",
+            style: TextStyle(color: Color(0xFFC9A227), fontWeight: FontWeight.w900, fontSize: 18),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventProvider = context.watch<EventProvider>();
     final primaryColor = eventProvider.primaryColor;
+    final secondaryColor = eventProvider.secondaryColor;
+    final topPadding = MediaQuery.of(context).padding.top;
 
     final List<dynamic> details = _currentOrder['details'] ?? [];
     final bool isPaid = _currentOrder['status_pembayaran_id'].toString() == '2';
@@ -256,206 +286,288 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: const Text("Detail Pesanan"),
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: CustomScrollView(
-        slivers: [
-          const SliverToBoxAdapter(child: EventHeader()),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Card Header Nota
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [primaryColor, primaryColor.withOpacity(0.8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryColor.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
+      body: Column(
+        children: [
+          // ── HEADER MODERN DENGAN TOMBOL BACK ──
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 20, bottom: 28),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  primaryColor,
+                  primaryColor.withOpacity(0.85),
+                  secondaryColor.withOpacity(0.7),
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // ── TOMBOL BACK ──
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
                         ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildPurnamaLogo(),
+                    const SizedBox(width: 10),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Hotel & Restoran",
+                            style: TextStyle(color: Colors.white60, fontSize: 9, letterSpacing: 1.2)),
+                        Text("PURNAMA BALIGE",
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
                       ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.receipt_long, size: 48, color: Colors.white),
-                          const SizedBox(height: 8),
-                          Text(
-                            "Nota #RS-${_currentOrder['id']}",
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: statusColor),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.notifications_none_rounded, color: Colors.white70, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.receipt_long_rounded, color: secondaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Detail Pesanan",
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const EventHeader(),
+          // ── BODY ──
+          Expanded(
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Card Header Nota
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [primaryColor, primaryColor.withOpacity(0.8)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                            child: Text(
-                              statusText,
-                              style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                          ),
-                          const Divider(height: 24, color: Colors.white30),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(locationIcon, size: 18, color: Colors.white70),
-                              const SizedBox(width: 8),
-                              Text(
-                                "Lokasi Antar: $deliveryType $locationNum",
-                                style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: primaryColor.withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Daftar Pesanan (tanpa harga per item)
-                  const Text(
-                    "Pesanan Anda",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: details.length,
-                      separatorBuilder: (_, __) => const Divider(height: 0, indent: 16, endIndent: 16),
-                      itemBuilder: (context, index) {
-                        final item = details[index];
-                        final menu = item['menu'];
-                        final int qty = int.tryParse(item['jumlah'].toString()) ?? 0;
-                        final String menuName = menu?['nama_menu'] ?? "Menu tidak ditemukan";
-                        final String? fotoMenu = menu?['foto_menu'];
-                        // ✅ PERBAIKAN: Process URL gambar sebelum dipakai
-                        final String processedImageUrl = _processImageUrl(fotoMenu);
-
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                          child: Row(
-                            children: [
-                              // Gambar kecil di kiri
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: fotoMenu != null && fotoMenu.isNotEmpty
-                                    ? Image.network(
-                                        processedImageUrl,
-                                        width: 50,
-                                        height: 50,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Container(
-                                          width: 50,
-                                          height: 50,
-                                          color: Colors.grey[200],
-                                          child: const Icon(Icons.fastfood, size: 25, color: Colors.grey),
-                                        ),
-                                      )
-                                    : Container(
-                                        width: 50,
-                                        height: 50,
-                                        color: Colors.grey[200],
-                                        child: const Icon(Icons.fastfood, size: 25, color: Colors.grey),
-                                      ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Nama dan jumlah (tanpa harga)
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              children: [
+                                const Icon(Icons.receipt_long, size: 48, color: Colors.white),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "Nota #RS-${_currentOrder['id']}",
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: statusColor),
+                                  ),
+                                  child: Text(
+                                    statusText,
+                                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                ),
+                                const Divider(height: 24, color: Colors.white30),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
+                                    Icon(locationIcon, size: 18, color: Colors.white70),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      menuName,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      "$qty porsi",
-                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      "Lokasi Antar: $deliveryType $locationNum",
+                                      style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w500),
                                     ),
                                   ],
                                 ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Daftar Pesanan
+                        const Text(
+                          "Pesanan Anda",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: details.length,
+                            separatorBuilder: (_, __) => const Divider(height: 0, indent: 16, endIndent: 16),
+                            itemBuilder: (context, index) {
+                              final item = details[index];
+                              final menu = item['menu'];
+                              final int qty = int.tryParse(item['jumlah'].toString()) ?? 0;
+                              final String menuName = menu?['nama_menu'] ?? "Menu tidak ditemukan";
+                              final String? fotoMenu = menu?['foto_menu'];
+                              final String processedImageUrl = _processImageUrl(fotoMenu);
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: fotoMenu != null && fotoMenu.isNotEmpty
+                                          ? Image.network(
+                                              processedImageUrl,
+                                              width: 50,
+                                              height: 50,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Container(
+                                                width: 50,
+                                                height: 50,
+                                                color: Colors.grey[200],
+                                                child: const Icon(Icons.fastfood, size: 25, color: Colors.grey),
+                                              ),
+                                            )
+                                          : Container(
+                                              width: 50,
+                                              height: 50,
+                                              color: Colors.grey[200],
+                                              child: const Icon(Icons.fastfood, size: 25, color: Colors.grey),
+                                            ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            menuName,
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            "$qty porsi",
+                                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    _buildTrailingWidget(item, isPaid, primaryColor),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Ringkasan Pembayaran
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
-                              // Tombol aksi (Ulas / Edit/Hapus) atau harga jika pending
-                              _buildTrailingWidget(item, isPaid, primaryColor),
                             ],
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Ringkasan Pembayaran
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.payment, size: 18),
+                                    SizedBox(width: 8),
+                                    Text("Detail Pembayaran", style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                const Divider(height: 20),
+                                _buildInfoRow("Metode Pembayaran", _currentOrder['metode_pembayaran'] ?? "-"),
+                                _buildInfoRow(
+                                  "Waktu Pesan",
+                                  _currentOrder['created_at'].toString().substring(0, 16).replaceAll('T', ' '),
+                                ),
+                                const Divider(height: 16),
+                                _buildInfoRow(
+                                  "Total Bayar",
+                                  "Rp ${double.parse(_currentOrder['total_harga'].toString()).toStringAsFixed(0)}",
+                                  isBold: true,
+                                  color: primaryColor,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: 30),
                       ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.payment, size: 18),
-                              SizedBox(width: 8),
-                              Text("Detail Pembayaran", style: TextStyle(fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                          const Divider(height: 20),
-                          _buildInfoRow("Metode Pembayaran", _currentOrder['metode_pembayaran'] ?? "-"),
-                          _buildInfoRow(
-                            "Waktu Pesan",
-                            _currentOrder['created_at'].toString().substring(0, 16).replaceAll('T', ' '),
-                          ),
-                          const Divider(height: 16),
-                          _buildInfoRow(
-                            "Total Bayar",
-                            "Rp ${double.parse(_currentOrder['total_harga'].toString()).toStringAsFixed(0)}",
-                            isBold: true,
-                            color: primaryColor,
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
-                  const SizedBox(height: 30),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],

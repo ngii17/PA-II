@@ -14,8 +14,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 class ApiServices {
 
-  static const String ipAddress = "10.178.206.132";
-
+  static const String ipAddress = String.fromEnvironment(
+    'API_IP',
+    defaultValue: '10.112.252.132',
+  );
   static const String baseUrl = "http://$ipAddress:8001/api";
   static const String _authUrl = "http://$ipAddress:8000/api";
   static const String _hotelUrl = "http://$ipAddress:8001/api";
@@ -128,11 +130,21 @@ class ApiServices {
 
   static Future<Map<String, dynamic>> storeReservation(Map<String, dynamic> data) async {
     try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? token = prefs.getString('auth_token'); // ← sama seperti logout
+
+      if (token == null) {
+        return {'success': false, 'message': 'Token tidak ditemukan, silakan login ulang'};
+      }
+
+      data.remove('user_id'); // buang user_id kalau masih ada di data
+
       final response = await http.post(
         Uri.parse("$_hotelUrl/reservasi"),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': 'Bearer $token', // ← tambahan ini
         },
         body: jsonEncode(data),
       );
@@ -161,13 +173,17 @@ class ApiServices {
     }
   }
 
-  static Future<Map<String, dynamic>> getReservationHistory(String userId) async {
+  static Future<Map<String, dynamic>> getReservationHistory() async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('auth_token');
 
+      if (token == null) {
+        return {'success': false, 'message': 'Token tidak ditemukan, silakan login ulang'};
+      }
+
       final response = await http.get(
-        Uri.parse("$_hotelUrl/reservasi/history?user_id=$userId"),
+        Uri.parse("$_hotelUrl/reservasi/history"), // ← hapus ?user_id=$userId
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',

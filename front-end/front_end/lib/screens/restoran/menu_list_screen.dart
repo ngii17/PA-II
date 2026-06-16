@@ -1,3 +1,5 @@
+// screens/restoran/menu_list_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_services.dart';
@@ -67,6 +69,43 @@ class _MenuListScreenState extends State<MenuListScreen> {
     }).toList();
   }
 
+  // ============================================================
+  // WIDGET PURNAMA LOGO
+  // ============================================================
+  Widget _buildPurnamaLogo() {
+    return Image.asset(
+      'assets/icons/icon-purnama.png',
+      width: 38,
+      height: 38,
+      errorBuilder: (_, __, ___) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
+          ),
+          border: Border.all(color: _AppColors.gold, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: _AppColors.gold.withOpacity(0.3),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Text(
+            "P",
+            style: TextStyle(color: _AppColors.gold, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 0),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding   = MediaQuery.of(context).padding.top;
@@ -90,6 +129,7 @@ class _MenuListScreenState extends State<MenuListScreen> {
             cartProvider: cartProvider,
             searchQuery: _searchQuery,
             onSearchChanged: (v) => setState(() => _searchQuery = v),
+            buildPurnamaLogo: _buildPurnamaLogo,
           ),
 
           // ── KATEGORI TETAP (STICKY) ──
@@ -254,6 +294,7 @@ class _MenuHeader extends StatelessWidget {
   final CartProvider cartProvider;
   final String      searchQuery;
   final ValueChanged<String> onSearchChanged;
+  final Widget Function() buildPurnamaLogo;
 
   const _MenuHeader({
     required this.topPadding,
@@ -262,6 +303,7 @@ class _MenuHeader extends StatelessWidget {
     required this.cartProvider,
     required this.searchQuery,
     required this.onSearchChanged,
+    required this.buildPurnamaLogo,
   });
 
   @override
@@ -302,7 +344,25 @@ class _MenuHeader extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _PurnamaLogo(),
+                  // ── TOMBOL BACK ──
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white70,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  buildPurnamaLogo(),
                   const SizedBox(width: 10),
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -417,43 +477,6 @@ class _MenuHeader extends StatelessWidget {
   }
 }
 
-class _PurnamaLogo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/icons/icon-purnama.png',
-      width: 38,
-      height: 38,
-      errorBuilder: (_, __, ___) => Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
-          ),
-          border: Border.all(color: _AppColors.gold, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: _AppColors.gold.withOpacity(0.3),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: const Center(
-          child: Text(
-            "P",
-            style: TextStyle(color: _AppColors.gold, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 0),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _HeaderIconButton extends StatelessWidget {
   final IconData     icon;
   final VoidCallback onTap;
@@ -558,7 +581,6 @@ class _MenuCard extends StatelessWidget {
     final bool hasPromo =
         menu.promoAktif != null && (menu.hargaAkhir < menu.hargaAsli);
 
-    // ── IMPLEMENTASI JALAN CEPAT PAMERAN: AUTO REPLACE IP ──
     String finalImageUrl = menu.fotoMenu ?? "";
     
     if (finalImageUrl.contains(RegExp(r'\d+\.\d+\.\d+\.\d+'))) {
@@ -672,81 +694,79 @@ class _MenuCard extends StatelessWidget {
                           ],
                         ),
                         GestureDetector(
-    onTap: () async {
-        // TAMBAHKAN PENGECEKAN GUEST ↓
-        final prefs = await SharedPreferences.getInstance();
-        int? userId = prefs.getInt('user_id');
+                          onTap: () async {
+                            final prefs = await SharedPreferences.getInstance();
+                            int? userId = prefs.getInt('user_id');
 
-        if (userId == null || userId == 0) {
-            if (context.mounted) {
-                showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-                        content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                                Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                        color: Colors.red.shade50,
-                                        shape: BoxShape.circle,
+                            if (userId == null || userId == 0) {
+                              if (context.mounted) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(Icons.lock_outline_rounded, color: Colors.red.shade400, size: 40),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          "Login Diperlukan",
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          "Silakan login terlebih dahulu untuk memesan menu.",
+                                          style: TextStyle(color: Colors.grey, fontSize: 13),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 24),
+                                      ],
                                     ),
-                                    child: Icon(Icons.lock_outline_rounded, color: Colors.red.shade400, size: 40),
-                                ),
-                                const SizedBox(height: 16),
-                                const Text(
-                                    "Login Diperlukan",
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                    "Silakan login terlebih dahulu untuk memesan menu.",
-                                    style: TextStyle(color: Colors.grey, fontSize: 13),
-                                    textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 24),
-                            ],
+                                    actions: [
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF00197D),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          ),
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text("Mengerti", style: TextStyle(color: Colors.white)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+
+                            cartProvider.addToCart(menu);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("${menu.namaMenu} ditambahkan ke keranjang"),
+                                duration: const Duration(seconds: 1),
+                                backgroundColor: primaryColor,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(20)),
+                            child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 13), SizedBox(width: 3), Text("Pesan", style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold))]),
+                          ),
                         ),
-                        actions: [
-                            SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF00197D),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    ),
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text("Mengerti", style: TextStyle(color: Colors.white)),
-                                ),
-                            ),
-                        ],
-                    ),
-                );
-            }
-            return;
-        }
-        // SAMPAI SINI ↑
-
-        cartProvider.addToCart(menu);
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text("${menu.namaMenu} ditambahkan ke keranjang"),
-                duration: const Duration(seconds: 1),
-                backgroundColor: primaryColor,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-        );
-    },
-    child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(20)),
-        child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.add_rounded, color: Colors.white, size: 13), SizedBox(width: 3), Text("Pesan", style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold))]),
-    ),
-)
                       ],
                     ),
                   ],

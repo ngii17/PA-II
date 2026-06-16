@@ -1,8 +1,12 @@
+// screens/restoran/waiting_payment_screen.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_services.dart';
 import '../../providers/event_provider.dart';
+import '../event/event_header.dart';
+import '../notification/notification_screen.dart';
 
 class WaitingPaymentScreen extends StatefulWidget {
   final int orderId;
@@ -113,6 +117,36 @@ class _WaitingPaymentScreenState extends State<WaitingPaymentScreen>
     super.dispose();
   }
 
+  // ============================================================
+  // WIDGET PURNAMA LOGO
+  // ============================================================
+  Widget _buildPurnamaLogo() {
+    return Image.asset(
+      'assets/icons/icon-purnama.png',
+      width: 38,
+      height: 38,
+      errorBuilder: (_, __, ___) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
+          ),
+          border: Border.all(color: const Color(0xFFC9A227), width: 2),
+        ),
+        child: const Center(
+          child: Text(
+            "P",
+            style: TextStyle(color: Color(0xFFC9A227), fontWeight: FontWeight.w900, fontSize: 18),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventProvider = context.watch<EventProvider>();
@@ -122,139 +156,171 @@ class _WaitingPaymentScreenState extends State<WaitingPaymentScreen>
 
     return Scaffold(
       backgroundColor: Colors.white,
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text(
-          "Status Transaksi",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: Column(
         children: [
+          // ── HEADER MODERN DENGAN TOMBOL BACK ──
           Container(
             width: double.infinity,
-            padding: EdgeInsets.only(top: topPadding + 50, bottom: 45),
+            padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 20, bottom: 28),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [primaryColor, secondaryColor.withOpacity(0.85)],
+                colors: [
+                  primaryColor,
+                  primaryColor.withOpacity(0.85),
+                  secondaryColor.withOpacity(0.7),
+                ],
               ),
               borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(60),
-                bottomRight: Radius.circular(60),
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
               ),
-              boxShadow: const [
-                BoxShadow(color: Colors.black12, blurRadius: 15, offset: Offset(0, 8)),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
               ],
             ),
             child: Column(
               children: [
-                ScaleTransition(
-                  scale: Tween(begin: 0.95, end: 1.1).animate(
-                    CurvedAnimation(
-                      parent: _animationController,
-                      curve: Curves.easeInOut,
+                Row(
+                  children: [
+                    // ── TOMBOL BACK ──
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(38),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white30, width: 2),
+                    const SizedBox(width: 10),
+                    _buildPurnamaLogo(),
+                    const SizedBox(width: 10),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Hotel & Restoran",
+                            style: TextStyle(color: Colors.white60, fontSize: 9, letterSpacing: 1.2)),
+                        Text("PURNAMA BALIGE",
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.restaurant_menu_rounded,
-                      color: Colors.white,
-                      size: 55,
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.notifications_none_rounded, color: Colors.white70, size: 18),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 25),
-                const Text(
-                  "MENUNGGU KONFIRMASI",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Nota Digital #RS-${widget.orderId}",
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.payment_rounded, color: secondaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Status Transaksi",
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
+          const EventHeader(),
+          // ── BODY ──
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 70,
-                    height: 70,
-                    child: CircularProgressIndicator(
-                      color: secondaryColor,
-                      strokeWidth: 6,
-                      backgroundColor: secondaryColor.withOpacity(0.2),
-                    ),
-                  ),
-                  const SizedBox(height: 45),
-                  Text(
-                    "Memverifikasi Pembayaran",
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  const Text(
-                    "Silakan selesaikan pembayaran pada jendela browser Anda.\nSistem akan mendeteksi transaksi secara otomatis dalam beberapa saat.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5),
-                  ),
-                  const SizedBox(height: 60),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 24),
-                      label: const Text(
-                        "KEMBALI KE PESANAN",
-                        style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ScaleTransition(
+                      scale: Tween(begin: 0.95, end: 1.1).animate(
+                        CurvedAnimation(
+                          parent: _animationController,
+                          curve: Curves.easeInOut,
+                        ),
                       ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: primaryColor, width: 1.8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: primaryColor.withOpacity(0.1),
+                          border: Border.all(color: secondaryColor, width: 2),
+                        ),
+                        child: Icon(
+                          Icons.restaurant_menu_rounded,
+                          color: primaryColor,
+                          size: 48,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 32),
+                    Text(
+                      "Menunggu Konfirmasi",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Text(
+                      "Silakan selesaikan pembayaran pada jendela browser Anda.\nSistem akan mendeteksi transaksi secara otomatis.\n\nNota #RS-${widget.orderId}",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 60),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.keyboard_arrow_left_rounded, size: 24),
+                        label: const Text(
+                          "KEMBALI KE PESANAN",
+                          style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: primaryColor, width: 1.8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
         ],
       ),
     );

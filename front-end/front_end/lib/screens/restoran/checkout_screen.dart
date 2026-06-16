@@ -1,3 +1,5 @@
+// screens/restoran/checkout_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +10,7 @@ import '../../providers/event_provider.dart';
 import 'menu_resto.dart';
 import 'cart_screen.dart';
 import 'waiting_payment_screen.dart';
+import '../home/promo_list_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../event/event_header.dart';
 import '../notification/notification_screen.dart';
@@ -29,7 +32,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _promoController = TextEditingController();
   double _discount = 0;
   String _promoName = "";
-  int? _appliedPromoId; // ← simpan promo_id dari response backend
+  int? _appliedPromoId;
   bool _isProcessing = false;
 
   List<Map<String, dynamic>> _getCartItemsDetails() {
@@ -79,14 +82,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _promoController.text,
       'restoran',
       userId: userId,
-      totalHarga: _getSubtotal(), // kirim subtotal, backend yang hitung potongan
+      totalHarga: _getSubtotal(),
     );
 
     if (result['success'] == true) {
       setState(() {
         _appliedPromoId = result['data']['promo_id'];
         _promoName      = result['data']['nama_promo'];
-        // Pakai potongan_dihitung dari backend — fix bug voucher nominal > total harga
         _discount       = double.parse(result['data']['potongan_dihitung'].toString());
       });
       _showSnackBar("Promo berhasil dipasang!", Colors.green);
@@ -125,11 +127,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         "user_id"          : userId ?? 1,
         "fcm_token"        : fcmToken,
         "metode_pembayaran": _paymentMethod,
-        "total_harga"      : _getSubtotal(), // ← kirim SUBTOTAL sebelum diskon, backend yang potong
+        "total_harga"      : _getSubtotal(),
         "tipe_pengantaran" : _deliveryType,
         "nomor_lokasi"     : _locationController.text,
         "items"            : items,
-        "promo_id"         : _appliedPromoId, // ← null jika tidak ada promo
+        "promo_id"         : _appliedPromoId,
       });
 
       if (result['success'] == true) {
@@ -179,13 +181,43 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  // ============================================================
+  // WIDGET PURNAMA LOGO
+  // ============================================================
+  Widget _buildPurnamaLogo() {
+    return Image.asset(
+      'assets/icons/icon-purnama.png',
+      width: 38,
+      height: 38,
+      errorBuilder: (_, __, ___) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
+          ),
+          border: Border.all(color: const Color(0xFFC9A227), width: 2),
+        ),
+        child: const Center(
+          child: Text(
+            "P",
+            style: TextStyle(color: Color(0xFFC9A227), fontWeight: FontWeight.w900, fontSize: 18),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final eventProvider = context.watch<EventProvider>();
     final primaryColor = eventProvider.primaryColor;
     final secondaryColor = eventProvider.secondaryColor;
-    final onPrimary = primaryColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white;
     final cartProvider = context.watch<CartProvider>();
+    final topPadding = MediaQuery.of(context).padding.top;
 
     final cartItems = _getCartItemsDetails();
     double subtotal = _getSubtotal();
@@ -193,62 +225,133 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: const Text("Konfirmasi Pesanan", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-        foregroundColor: onPrimary,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [primaryColor, secondaryColor.withOpacity(0.85)],
-            ),
-          ),
-        ),
-        leading: _PurnamaLogo(),
-        actions: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_bag_outlined),
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen())),
+      body: Column(
+        children: [
+          // ── HEADER MODERN DENGAN TOMBOL BACK ──
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 20, bottom: 28),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  primaryColor,
+                  primaryColor.withOpacity(0.85),
+                  secondaryColor.withOpacity(0.7),
+                ],
               ),
-              if (cartProvider.totalItems > 0)
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Container(
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: secondaryColor,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: primaryColor, width: 1.5),
-                    ),
-                    child: Center(
-                      child: Text(
-                        "${cartProvider.totalItems}",
-                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(36),
+                bottomRight: Radius.circular(36),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // ── TOMBOL BACK ──
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    _buildPurnamaLogo(),
+                    const SizedBox(width: 10),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Hotel & Restoran",
+                            style: TextStyle(color: Colors.white60, fontSize: 9, letterSpacing: 1.2)),
+                        Text("PURNAMA BALIGE",
+                            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                      ],
+                    ),
+                    const Spacer(),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.shopping_bag_outlined, color: Colors.white70),
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen())),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        if (cartProvider.totalItems > 0)
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: secondaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: primaryColor, width: 1.5),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "${cartProvider.totalItems}",
+                                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.notifications_none_rounded, color: Colors.white70, size: 18),
+                      ),
+                    ),
+                  ],
                 ),
-            ],
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.receipt_long_rounded, color: secondaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Konfirmasi Pesanan",
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const EventHeader(),
-            Padding(
+          const EventHeader(),
+          // ── BODY ──
+          Expanded(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,7 +462,52 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ),
                   const SizedBox(height: 25),
-                  const Text("Punya Kode Promo?", style: TextStyle(fontWeight: FontWeight.bold)),
+                  
+                  // ── BAGIAN PROMO DENGAN TOMBOL LIHAT PROMO ──
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          "Punya Kode Promo?",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final result = await Navigator.push<String>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PromoListScreen(
+                                kategori: 'restoran',
+                              ),
+                            ),
+                          );
+                          
+                          if (result != null && result.isNotEmpty) {
+                            setState(() {
+                              _promoController.text = result;
+                            });
+                            _checkPromo();
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: secondaryColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.local_offer_rounded, color: secondaryColor, size: 16),
+                            const SizedBox(width: 4),
+                            const Text(
+                              "Lihat Promo",
+                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -393,7 +541,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ],
                   ),
-                  // Tampilkan nama promo jika sudah terpasang
                   if (_promoName.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
@@ -406,7 +553,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600, fontSize: 13),
                           ),
                           const Spacer(),
-                          // Tombol hapus promo
                           GestureDetector(
                             onTap: () => setState(() {
                               _appliedPromoId = null;
@@ -454,7 +600,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             onPressed: _payNow,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: primaryColor,
-                              foregroundColor: onPrimary,
+                              foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               elevation: 4,
                             ),
@@ -465,8 +611,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -486,39 +632,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.w600, fontSize: isBold ? 20 : 14, color: color),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _PurnamaLogo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: Image.asset(
-        'assets/icons/icon-purnama.png',
-        width: 34,
-        height: 34,
-        errorBuilder: (_, __, ___) => Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
-            ),
-            border: Border.all(color: const Color(0xFFC9A227), width: 2),
-          ),
-          child: const Center(
-            child: Text(
-              "P",
-              style: TextStyle(color: Color(0xFFC9A227), fontWeight: FontWeight.w900, fontSize: 16),
-            ),
-          ),
-        ),
       ),
     );
   }

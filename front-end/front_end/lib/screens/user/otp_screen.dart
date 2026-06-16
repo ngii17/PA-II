@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../services/api_services.dart';
 import '../../providers/event_provider.dart';
 import 'login_screen.dart';
+import '../../widgets/login_widgets.dart'; // ← tambahkan ini
 
 class OtpScreen extends StatefulWidget {
   final String email;
@@ -45,6 +46,7 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
   void _handleVerify() async {
     if (_otpController.text.isEmpty || _otpController.text.length != 6) {
       setState(() => _errorMessage = "Masukkan 6 digit kode OTP");
+      ModernNotify.show(context, "Masukkan 6 digit kode OTP yang valid.");
       return;
     }
 
@@ -56,21 +58,24 @@ class _OtpScreenState extends State<OtpScreen> with TickerProviderStateMixin {
     final result = await ApiServices.verifyOtp(widget.email, _otpController.text);
     setState(() => _isLoading = false);
 
-    if (result['success'] == true) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message']), backgroundColor: Colors.green),
-      );
+// SESUDAH
+if (result['success'] == true) {
+  if (!mounted) return;
+  ModernNotify.show(context, result['message'] ?? "Email berhasil diverifikasi!", isError: false);
+  Future.delayed(const Duration(milliseconds: 1500), () {
+    if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const LoginScreen()),
         (route) => false,
       );
-    } else {
-      setState(() =>
-          _errorMessage = result['message'] ?? 'Kode OTP salah atau sudah expired');
     }
+  });
+  } else {
+    setState(() => _errorMessage = result['message'] ?? 'Kode OTP salah atau sudah expired');
+    ModernNotify.show(context, _errorMessage!);
   }
+} // ← INI yang hilang, penutup method _handleVerify()
 
   @override
   Widget build(BuildContext context) {

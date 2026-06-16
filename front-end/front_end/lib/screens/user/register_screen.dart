@@ -234,19 +234,27 @@ class _RegisterScreenState extends State<RegisterScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // SESUDAH — ganti Container icon dengan Image.asset
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(9),
+                                width: 52,
+                                height: 52,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: headerAccent.withAlpha(160),
-                                      width: 1.5),
+                                  border: Border.all(color: headerAccent.withAlpha(160), width: 1.5),
                                   color: onPrimary.withAlpha(18),
                                 ),
-                                child: Icon(Icons.waves_rounded,
-                                    color: headerAccent, size: 22),
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    'assets/icons/icon-purnama.png',
+                                    width: 52,
+                                    height: 52,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (c, e, s) =>
+                                        Icon(Icons.waves_rounded, color: headerAccent, size: 22),
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Column(
@@ -254,8 +262,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 children: [
                                   Text(
                                     hasEvent
-                                        ? (eventProvider.activeTheme['nama_hotel'] ??
-                                                'PURNAMA')
+                                        ? (eventProvider.activeTheme['nama_hotel'] ?? 'PURNAMA')
                                             .toString()
                                             .toUpperCase()
                                         : "PURNAMA",
@@ -268,7 +275,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   Text(
                                     "HOTEL & RESTAURANT",
                                     style: TextStyle(
-                                        color: onPrimary.withOpacity(0.45),
+                                        color: onPrimary.withAlpha(115),
                                         fontSize: 9,
                                         letterSpacing: 3),
                                   ),

@@ -5,11 +5,8 @@ import 'package:provider/provider.dart';
 import '../../services/api_services.dart';
 import '../../providers/event_provider.dart';
 import '../event/event_header.dart';
-import 'profile_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
-  static const String ipAddress = "10.158.185.132"; 
-
   final Map<String, dynamic> userData;
   const EditProfileScreen({super.key, required this.userData});
 
@@ -34,8 +31,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'avatar1.png', 'avatar2.png', 'avatar3.png', 'avatar4.png',
     'avatar5.png', 'avatar6.png', 'avatar7.png', 'avatar8.png',
   ];
-
-  // Ganti dengan URL backend kamu
 
   @override
   void initState() {
@@ -96,20 +91,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-String _getAvatarUrl(String? avatarNameOrUrl) {
-  if (avatarNameOrUrl == null || avatarNameOrUrl.isEmpty) {
-    return '';
-  }
-  
-  // Jika sudah full URL (dimulai dengan http), pakai langsung
-  if (avatarNameOrUrl.startsWith('http')) {
-    return avatarNameOrUrl;
-  }
-  
-  // Jika hanya nama file (avatar3.png), construct URL
-  return 'http://${ProfileScreen.ipAddress}:8000/avatars/$avatarNameOrUrl';
-}
+  String _getAvatarUrl(String? avatarNameOrUrl) {
+    if (avatarNameOrUrl == null || avatarNameOrUrl.isEmpty) {
+      return '';
+    }
 
+    // Jika sudah full URL (dimulai dengan http), pakai langsung
+    if (avatarNameOrUrl.startsWith('http')) {
+      return avatarNameOrUrl;
+    }
+
+    // Jika hanya nama file (avatar3.png), construct URL
+    // Sumber IP sekarang terpusat di ApiServices, bukan ProfileScreen lagi
+    return 'http://${ApiServices.ipAddress}:8000/avatars/$avatarNameOrUrl';
+  }
 
   void _showAvatarPicker(Color primaryColor, Color buttonColor, Color buttonTextColor) {
     showModalBottomSheet(
@@ -149,8 +144,12 @@ String _getAvatarUrl(String? avatarNameOrUrl) {
                       ),
                     ),
                     child: CircleAvatar(
-  backgroundImage: NetworkImage(_getAvatarUrl(avatar)),
-),
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: NetworkImage(_getAvatarUrl(avatar)),
+                      onBackgroundImageError: (exception, stackTrace) {
+                        debugPrint('Gagal load avatar $avatar: $exception');
+                      },
+                    ),
                   ),
                 );
               },
@@ -180,10 +179,10 @@ String _getAvatarUrl(String? avatarNameOrUrl) {
       colors: [primaryColor, secondaryColor.withOpacity(0.85)],
     );
 
-// URL avatar yang sedang dipilih
-final String? avatarUrl = _selectedAvatar != null
-    ? _getAvatarUrl(_selectedAvatar)
-    : _currentPhotoUrl;
+    // URL avatar yang sedang dipilih
+    final String? avatarUrl = _selectedAvatar != null
+        ? _getAvatarUrl(_selectedAvatar)
+        : _currentPhotoUrl;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -232,12 +231,12 @@ final String? avatarUrl = _selectedAvatar != null
                       child: CircleAvatar(
                         radius: 65,
                         backgroundColor: Colors.white,
-                        backgroundImage: avatarUrl != null 
-                          ? NetworkImage('$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}') 
-                          : null,
-                        child: avatarUrl == null
-                          ? Icon(Icons.person, size: 70, color: primaryColor)
-                          : null,
+                        backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                            ? NetworkImage('$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}')
+                            : null,
+                        child: (avatarUrl == null || avatarUrl.isEmpty)
+                            ? Icon(Icons.person, size: 70, color: primaryColor)
+                            : null,
                       ),
                     ),
                     // Tombol ganti avatar

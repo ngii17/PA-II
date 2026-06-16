@@ -1,3 +1,5 @@
+// screens/hotel/room_list_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_services.dart';
@@ -8,6 +10,7 @@ import 'booking_screen.dart';
 import '../event/event_header.dart';
 import '../notification/notification_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 // ─────────────────────────────────────────────
 //  WARNA (konsisten dengan home_screen.dart)
 // ─────────────────────────────────────────────
@@ -78,6 +81,34 @@ class _RoomListScreenState extends State<RoomListScreen> {
     return buffer.toString();
   }
 
+  // ============================================================
+  // WIDGET PURNAMA LOGO
+  // ============================================================
+  Widget _buildPurnamaLogo() {
+    return Image.asset(
+      'assets/icons/icon-purnama.png',
+      width: 38,
+      height: 38,
+      errorBuilder: (_, __, ___) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
+          ),
+          border: Border.all(color: _AppColors.gold, width: 2),
+          boxShadow: [BoxShadow(color: _AppColors.gold.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
+        ),
+        child: const Center(
+          child: Text("P", style: TextStyle(color: _AppColors.gold, fontWeight: FontWeight.w900, fontSize: 18)),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
@@ -92,7 +123,6 @@ class _RoomListScreenState extends State<RoomListScreen> {
       body: Column(
         children: [
           // ── HEADER TETAP (STICKY) ──
-          // Bagian ini tidak akan ikut ter-scroll
           _RoomHeader(
             topPadding: topPadding,
             primaryColor: primaryColor,
@@ -102,6 +132,7 @@ class _RoomListScreenState extends State<RoomListScreen> {
             filters: _filters,
             selectedFilter: _selectedFilter,
             onFilterSelect: (f) => setState(() => _selectedFilter = f),
+            buildPurnamaLogo: _buildPurnamaLogo,
           ),
 
           // ── BODY (SCROLLABLE) ──
@@ -203,17 +234,18 @@ class _RoomListScreenState extends State<RoomListScreen> {
 }
 
 // ─────────────────────────────────────────────
-//  HEADER  (style home_screen)
+//  HEADER (dengan tombol back)
 // ─────────────────────────────────────────────
 class _RoomHeader extends StatelessWidget {
-  final double             topPadding;
-  final Color              primaryColor;
-  final Color              accentColor;
-  final String             searchQuery;
+  final double topPadding;
+  final Color primaryColor;
+  final Color accentColor;
+  final String searchQuery;
   final ValueChanged<String> onSearchChanged;
-  final List<String>       filters;
-  final String             selectedFilter;
+  final List<String> filters;
+  final String selectedFilter;
   final ValueChanged<String> onFilterSelect;
+  final Widget Function() buildPurnamaLogo;
 
   const _RoomHeader({
     required this.topPadding,
@@ -224,6 +256,7 @@ class _RoomHeader extends StatelessWidget {
     required this.filters,
     required this.selectedFilter,
     required this.onFilterSelect,
+    required this.buildPurnamaLogo,
   });
 
   @override
@@ -250,7 +283,7 @@ class _RoomHeader extends StatelessWidget {
               ],
             ),
             borderRadius: const BorderRadius.only(
-              bottomLeft:  Radius.circular(36),
+              bottomLeft: Radius.circular(36),
               bottomRight: Radius.circular(36),
             ),
             boxShadow: [
@@ -265,7 +298,25 @@ class _RoomHeader extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _PurnamaLogo(),
+                  // ── TOMBOL BACK ──
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white70,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  buildPurnamaLogo(),
                   const SizedBox(width: 10),
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -554,63 +605,38 @@ class _RoomCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-    flex: 2,
-    child: GestureDetector(
-        onTap: () async {
-            final prefs = await SharedPreferences.getInstance();
-            int? userId = prefs.getInt('user_id');
-            if (userId == null || userId == 0) {
-                if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text("Silakan login terlebih dahulu untuk melakukan reservasi kamar."),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                        ),
-                    );
-                }
-                return;
-            }
-            if (context.mounted) {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => BookingScreen(room: room)));
-            }
-        },
-        child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.85)]), borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 3))]),
-            child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.calendar_month_rounded, size: 14, color: Colors.white), SizedBox(width: 5), Text("Book Now", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))]),
-        ),
-    ),
-),
+                  flex: 2,
+                  child: GestureDetector(
+                    onTap: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      int? userId = prefs.getInt('user_id');
+                      if (userId == null || userId == 0) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Silakan login terlebih dahulu untuk melakukan reservasi kamar."),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      if (context.mounted) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => BookingScreen(room: room)));
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.85)]), borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 3))]),
+                      child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.calendar_month_rounded, size: 14, color: Colors.white), SizedBox(width: 5), Text("Book Now", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white))]),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────
-//  LOGO PURNAMA
-// ─────────────────────────────────────────────
-class _PurnamaLogo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/icons/icon-purnama.png',
-      width: 38,
-      height: 38,
-      errorBuilder: (_, __, ___) => Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)]),
-          border: Border.all(color: _AppColors.gold, width: 2),
-          boxShadow: [BoxShadow(color: _AppColors.gold.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
-        ),
-        child: const Center(child: Text("P", style: TextStyle(color: _AppColors.gold, fontWeight: FontWeight.w900, fontSize: 18))),
       ),
     );
   }

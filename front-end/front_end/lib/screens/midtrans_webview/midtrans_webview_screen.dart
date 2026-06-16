@@ -1,8 +1,11 @@
+// screens/payment/midtrans_webview_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../hotel/waiting_payment_screen.dart';
 import '../../providers/event_provider.dart';
+import '../notification/notification_screen.dart';
 
 class MidtransWebViewScreen extends StatefulWidget {
   final String redirectUrl;
@@ -46,7 +49,6 @@ class _MidtransWebViewScreenState extends State<MidtransWebViewScreen> {
           onNavigationRequest: (request) {
             final url = request.url.toLowerCase();
 
-            // Deteksi redirect Midtrans selesai (success)
             if (url.contains('status_code=200') ||
                 url.contains('status_code=201') ||
                 url.contains('finish') ||
@@ -55,7 +57,6 @@ class _MidtransWebViewScreenState extends State<MidtransWebViewScreen> {
               return NavigationDecision.prevent;
             }
 
-            // Deteksi pembatalan / error
             if (url.contains('unfinish') || url.contains('error')) {
               _handlePaymentIncomplete();
               return NavigationDecision.prevent;
@@ -120,11 +121,42 @@ class _MidtransWebViewScreenState extends State<MidtransWebViewScreen> {
     return confirm ?? false;
   }
 
+  // ============================================================
+  // WIDGET PURNAMA LOGO
+  // ============================================================
+  Widget _buildPurnamaLogo() {
+    return Image.asset(
+      'assets/icons/icon-purnama.png',
+      width: 38,
+      height: 38,
+      errorBuilder: (_, __, ___) => Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A4A9E), Color(0xFF0C2D6B)],
+          ),
+          border: Border.all(color: const Color(0xFFC9A227), width: 2),
+        ),
+        child: const Center(
+          child: Text(
+            "P",
+            style: TextStyle(color: Color(0xFFC9A227), fontWeight: FontWeight.w900, fontSize: 18),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ep = context.watch<EventProvider>();
     final Color primary = ep.eventCode != 'default' ? ep.primaryColor : const Color(0xFF0C2D6B);
     final Color secondary = ep.eventCode != 'default' ? ep.secondaryColor : const Color(0xFFC9A227);
+    final topPadding = MediaQuery.of(context).padding.top;
 
     return PopScope(
       canPop: false,
@@ -135,87 +167,162 @@ class _MidtransWebViewScreenState extends State<MidtransWebViewScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        appBar: AppBar(
-          title: const Text(
-            "Gerbang Pembayaran",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              letterSpacing: 0.5,
-            ),
-          ),
-          centerTitle: true,
-          backgroundColor: primary,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.close_rounded),
-            onPressed: () async {
-              if (await _onWillPop()) {
-                if (mounted) Navigator.pop(context);
-              }
-            },
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded),
-              onPressed: () => _controller.reload(),
-            ),
-          ],
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [primary, secondary.withOpacity(0.85)],
-              ),
-            ),
-          ),
-        ),
-        body: Stack(
+        body: Column(
           children: [
-            WebViewWidget(controller: _controller),
-            if (_progress < 1.0)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: LinearProgressIndicator(
-                  value: _progress,
-                  backgroundColor: Colors.transparent,
-                  color: secondary,
-                  minHeight: 2.5,
+            // ── HEADER MODERN ──
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 20, bottom: 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    primary,
+                    primary.withOpacity(0.85),
+                    secondary.withOpacity(0.7),
+                  ],
                 ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(36),
+                  bottomRight: Radius.circular(36),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: primary.withOpacity(0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-            if (_isLoading && _progress < 0.1)
-              Container(
-                color: Colors.white,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(primary),
-                        strokeWidth: 3,
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        "Menyiapkan Halaman Pembayaran...",
-                        style: TextStyle(
-                          color: primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                      GestureDetector(
+                        onTap: () async {
+                          if (await _onWillPop()) {
+                            if (mounted) Navigator.pop(context);
+                          }
+                        },
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "Mohon jangan tutup halaman ini",
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      const SizedBox(width: 10),
+                      _buildPurnamaLogo(),
+                      const SizedBox(width: 10),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Hotel & Restoran",
+                              style: TextStyle(color: Colors.white60, fontSize: 9, letterSpacing: 1.2)),
+                          Text("PURNAMA BALIGE",
+                              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                        ],
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => _controller.reload(),
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 18),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationScreen())),
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.notifications_none_rounded, color: Colors.white70, size: 18),
+                        ),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.payment_rounded, color: secondary, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Gerbang Pembayaran",
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            ),
+            // ── WEBVIEW ──
+            Expanded(
+              child: Stack(
+                children: [
+                  WebViewWidget(controller: _controller),
+                  if (_progress < 1.0)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: LinearProgressIndicator(
+                        value: _progress,
+                        backgroundColor: Colors.transparent,
+                        color: secondary,
+                        minHeight: 2.5,
+                      ),
+                    ),
+                  if (_isLoading && _progress < 0.1)
+                    Container(
+                      color: Colors.white,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(primary),
+                              strokeWidth: 3,
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              "Menyiapkan Halaman Pembayaran...",
+                              style: TextStyle(
+                                color: primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              "Mohon jangan tutup halaman ini",
+                              style: TextStyle(color: Colors.grey, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

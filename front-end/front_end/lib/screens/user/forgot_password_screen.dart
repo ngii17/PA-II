@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../services/api_services.dart';
 import '../../providers/event_provider.dart';
 import 'reset_password_screen.dart';
+import '../../widgets/login_widgets.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});

@@ -184,43 +184,55 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Logo & Brand
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(9),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: headerAccent.withAlpha(160), width: 1.5),
-                                  color: onPrimary.withAlpha(18),
+                        // SESUDAH — ganti Container icon dengan Image.asset
+                        Row(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: headerAccent.withAlpha(160), width: 1.5),
+                                color: onPrimary.withAlpha(18),
+                              ),
+                              child: ClipOval(
+                                child: Image.asset(
+                                  'assets/icons/icon-purnama.png',
+                                  width: 52,
+                                  height: 52,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) =>
+                                      Icon(Icons.waves_rounded, color: headerAccent, size: 22),
                                 ),
-                                child: Icon(Icons.waves_rounded, color: headerAccent, size: 22),
                               ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    hasEvent
-                                        ? (eventProvider.activeTheme['nama_hotel'] ?? 'PURNAMA').toString().toUpperCase()
-                                        : "PURNAMA",
-                                    style: TextStyle(
-                                        color: onPrimary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 2),
-                                  ),
-                                  Text(
-                                    "HOTEL & RESTAURANT",
-                                    style: TextStyle(
-                                        color: onPrimary.withAlpha(115),
-                                        fontSize: 9,
-                                        letterSpacing: 3),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  hasEvent
+                                      ? (eventProvider.activeTheme['nama_hotel'] ?? 'PURNAMA')
+                                          .toString()
+                                          .toUpperCase()
+                                      : "PURNAMA",
+                                  style: TextStyle(
+                                      color: onPrimary,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 2),
+                                ),
+                                Text(
+                                  "HOTEL & RESTAURANT",
+                                  style: TextStyle(
+                                      color: onPrimary.withAlpha(115),
+                                      fontSize: 9,
+                                      letterSpacing: 3),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                           const SizedBox(height: 28),
                           Text(
                             "Sign in",

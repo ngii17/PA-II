@@ -56,6 +56,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           if (history.isEmpty) return _buildEmptyState(primaryColor);
 
           return ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(), // ← tambah ini
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             itemCount: history.length,
             itemBuilder: (context, index) {
@@ -217,41 +218,49 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     );
   }
 
-  Widget _buildEmptyState(Color primaryColor) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.no_meals_rounded, size: 70, color: Colors.grey.shade300),
-          const SizedBox(height: 12),
-          const Text(
-            "Belum ada riwayat pesanan",
-            style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w600),
+Widget _buildEmptyState(Color primaryColor) {
+  return ListView(
+    physics: const AlwaysScrollableScrollPhysics(),
+    children: [
+      SizedBox(
+        height: 400,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.no_meals_rounded, size: 70, color: Colors.grey.shade300),
+              const SizedBox(height: 12),
+              const Text(
+                "Belum ada riwayat pesanan",
+                style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                "Silakan pesan makanan terlebih dahulu",
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MenuListScreen()),
+                  );
+                },
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text("PESAN MAKANAN SEKARANG"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primaryColor,
+                  side: BorderSide(color: primaryColor, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          const Text(
-            "Silakan pesan makanan terlebih dahulu",
-            style: TextStyle(color: Colors.grey, fontSize: 12),
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const MenuListScreen()),
-              );
-            },
-            icon: const Icon(Icons.add_circle_outline, size: 18),
-            label: const Text("PESAN MAKANAN SEKARANG"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: primaryColor,
-              side: BorderSide(color: primaryColor, width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-          ),
-        ],
+        ),
       ),
-    );
+    ],
+  );
   }
 }

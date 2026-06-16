@@ -1,10 +1,12 @@
+// screens/restoran/cart_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_services.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/event_provider.dart';
-import 'checkout_screen.dart';
-import 'menu_resto.dart'; // Pastikan path import ini benar sesuai folder Anda
+import '../restoran/checkout_screen.dart';
+import 'menu_resto.dart';
 import '../event/event_header.dart';
 import '../notification/notification_screen.dart';
 
@@ -24,7 +26,7 @@ class CartScreen extends StatelessWidget {
       backgroundColor: Colors.grey.shade50,
       body: Column(
         children: [
-          // Header gradien premium
+          // Header gradien premium dengan tombol back
           Container(
             width: double.infinity,
             padding: EdgeInsets.only(top: topPadding + 16, left: 20, right: 20, bottom: 28),
@@ -54,6 +56,24 @@ class CartScreen extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    // ── TOMBOL BACK ──
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
                     _PurnamaLogo(primaryColor: primaryColor, secondaryColor: secondaryColor),
                     const SizedBox(width: 10),
                     const Column(
@@ -91,7 +111,7 @@ class CartScreen extends StatelessWidget {
           const EventHeader(),
           Expanded(
             child: cartItems.isEmpty
-                ? _buildEmptyState(context, primaryColor) // Perbaikan: Kirim context ke fungsi
+                ? _buildEmptyState(context, primaryColor)
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: cartItems.length,
@@ -115,7 +135,7 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  // Fungsi Empty State diperbaiki dengan parameter BuildContext
+  // Fungsi Empty State
   Widget _buildEmptyState(BuildContext context, Color primaryColor) {
     return Center(
       child: Column(
@@ -200,7 +220,7 @@ class _PurnamaLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      'assets/icons/logo-purnama.png',
+      'assets/icons/icon-purnama.png',
       width: 38,
       height: 38,
       errorBuilder: (_, __, ___) => Container(
