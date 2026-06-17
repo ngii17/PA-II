@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
-use App\Models\hotel\Reservasi;
-use App\Models\restoran\PesananMenu;
+use App\Models\Hotel\Reservasi;
+use App\Models\Restoran\PesananMenu;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
