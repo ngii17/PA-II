@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\hotel; // Gunakan 'hotel' kecil agar konsisten
+namespace App\Models\Hotel; // Gunakan 'hotel' kecil agar konsisten
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
