@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Dashboard\Restoran;
 
 use App\Http\Controllers\Controller;
-use App\Models\restoran\PesananMenu;
-use App\Models\restoran\DetailPesanan;
-use App\Models\restoran\Menu;
-use App\Models\restoran\StatusPesanan;
-use App\Models\restoran\StatusPembayaran;
+use App\Models\Restoran\PesananMenu;
+use App\Models\Restoran\DetailPesanan;
+use App\Models\Restoran\Menu;
+use App\Models\Restoran\StatusPesanan;
+use App\Models\Restoran\StatusPembayaran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;

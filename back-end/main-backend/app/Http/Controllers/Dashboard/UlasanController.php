@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
-use App\Models\hotel\UlasanHotel;
+use App\Models\Hotel\UlasanHotel;
 use App\Models\restoran\UlasanRestoran;
 use Illuminate\Support\Facades\Http;
 

@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Dashboard\Hotel;
 
 use App\Http\Controllers\Controller;
-use App\Models\hotel\Kamar;
-use App\Models\hotel\TipeKamar;
-use App\Models\hotel\StatusKamar;
-use App\Models\hotel\Reservasi; // Tambahkan untuk pengecekan keamanan
+use App\Models\Hotel\Kamar;
+use App\Models\Hotel\TipeKamar;
+use App\Models\Hotel\StatusKamar;
+use App\Models\Hotel\Reservasi; // Tambahkan untuk pengecekan keamanan
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 

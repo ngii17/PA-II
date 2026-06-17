@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Dashboard\Restoran;
 
 use App\Http\Controllers\Controller;
-use App\Models\restoran\Menu;
-use App\Models\restoran\StatusMenu;
-use App\Models\restoran\KategoriMenu;
+use App\Models\Restoran\Menu;
+use App\Models\Restoran\StatusMenu;
+use App\Models\Restoran\KategoriMenu;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 

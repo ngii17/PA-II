@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Dashboard\Restoran;
 
 use App\Http\Controllers\Controller;
 use App\Models\event\Event;
-use App\Models\restoran\Menu;
-use App\Models\restoran\MenuEvent;
+use App\Models\Restoran\Menu;
+use App\Models\Restoran\MenuEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB; 
 

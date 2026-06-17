@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Dashboard\Restoran;
 
 use App\Http\Controllers\Controller;
-use App\Models\restoran\PesananMenu;
+use App\Models\Restoran\PesananMenu;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;

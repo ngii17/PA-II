@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Dashboard\Hotel;
 
 use App\Http\Controllers\Controller;
-use App\Models\hotel\TipeKamar;
+use App\Models\Hotel\TipeKamar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage; // ✅ Tambahkan ini

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Dashboard\Restoran;
 
 use App\Http\Controllers\Controller;
-use App\Models\restoran\UlasanRestoran;
+use App\Models\Restoran\UlasanRestoran;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log; // Import Log untuk debugging

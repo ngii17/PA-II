@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Dashboard\Hotel;
 
 use App\Http\Controllers\Controller;
-use App\Models\hotel\Reservasi;
+use App\Models\Hotel\Reservasi;
 use Illuminate\Support\Facades\Http;
 
 class PembayaranHotelController extends Controller 
