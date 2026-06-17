@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Dashboard;
 
 use App\Http\Controllers\Controller;
-use App\Models\hotel\Reservasi;
-use App\Models\hotel\Kamar;
+use App\Models\Hotel\Reservasi;
+use App\Models\Hotel\Kamar;
 use App\Models\restoran\PesananMenu; // Gunakan huruf kecil sesuai folder kamu
 use App\Models\restoran\Menu;
 use App\Models\event\Event;
