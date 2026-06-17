@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\event\Event;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class EventController extends Controller
 {
@@ -63,9 +64,6 @@ class EventController extends Controller
         if ($request->is_active == 1) {
             Event::query()->update(['is_active' => false]);
         }
-
-        // Pastikan folder tujuan ada
-        $this->ensureEventsFolderExists();
 
         Event::create([
             'nama_event'       => $request->nama_event,
@@ -127,9 +125,6 @@ class EventController extends Controller
             Event::where('id', '!=', $id)->update(['is_active' => false]);
         }
 
-        // Pastikan folder tujuan ada
-        $this->ensureEventsFolderExists();
-
         $event->update([
             'nama_event'       => $request->nama_event,
             'is_active'        => $request->is_active,
@@ -171,18 +166,7 @@ class EventController extends Controller
     // ============================================================
 
     /**
-     * Pastikan folder public/storage/events/ ada
-     */
-    private function ensureEventsFolderExists(): void
-    {
-        $folder = public_path('storage/events');
-        if (!file_exists($folder)) {
-            mkdir($folder, 0755, true);
-        }
-    }
-
-    /**
-     * Upload gambar ke public/storage/events/
+     * Upload gambar ke disk 'public', folder events/
      * Hapus file lama jika ada file baru yang diupload
      *
      * @param  Request     $request
@@ -197,36 +181,30 @@ class EventController extends Controller
             return $oldPath;
         }
 
-        // Hapus file lama dari public/storage/events/ jika ada
+        // Hapus file lama lewat disk 'public' jika ada
         if ($oldPath && !str_starts_with($oldPath, 'http')) {
-            $oldFullPath = public_path('storage/' . $oldPath);
-            if (file_exists($oldFullPath)) {
-                unlink($oldFullPath);
-            }
+            Storage::disk('public')->delete($oldPath);
         }
 
-        $file      = $request->file($field); // ✅ pakai $field, bukan hardcode 'header_image'
+        $file      = $request->file($field);
         $extension = $file->getClientOriginalExtension();
         $filename  = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME))
                      . '.' . $extension;
 
-        // Pindahkan file ke public/storage/events/
-        $file->move(public_path('storage/events'), $filename);
+        // Simpan lewat disk 'public' (otomatis bikin folder events/ kalau belum ada)
+        $file->storeAs('events', $filename, 'public');
 
         return 'events/' . $filename; // contoh: "events/1720000000_header-imlek.jpg"
     }
 
     /**
-     * Hapus file dari public/storage/events/
+     * Hapus file dari disk 'public', folder events/
      * Skip jika path adalah URL eksternal (http/https)
      */
     private function deleteImage(?string $path): void
     {
         if (!$path || str_starts_with($path, 'http')) return;
 
-        $fullPath = public_path('storage/' . $path);
-        if (file_exists($fullPath)) {
-            unlink($fullPath);
-        }
+        Storage::disk('public')->delete($path);
     }
 }

@@ -30,7 +30,6 @@ class MenuController extends Controller
     // 2. SIMPAN MENU (FIX: Validasi & Status Otomatis)
     public function store(Request $request)
     {
-        
         // Validasi diperketat
         $request->validate([
             'nama_menu'        => 'required|string|max:255',
@@ -43,19 +42,20 @@ class MenuController extends Controller
 
         try {
             $data = $request->all();
-            
+
             // Sesuai aturan: Stok awal 0
-            $data['stok'] = 0; 
+            $data['stok'] = 0;
 
             // LOGIKA SINKRONISASI: Jika stok 0, status WAJIB 'Habis' (ID 2)
-            $data['status_menu_id'] = 2; 
+            $data['status_menu_id'] = 2;
 
             // Proses Unggah Foto
             if ($request->hasFile('foto_menu')) {
                 $file = $request->file('foto_menu');
                 $filename = time() . '_' . str_replace(' ', '_', $request->nama_menu) . '.' . $file->getClientOriginalExtension();
-                
-                $file->storeAs('public/menu', $filename);
+
+                // FIX: sebutkan disk 'public' secara eksplisit (parameter ke-3)
+                $file->storeAs('menu', $filename, 'public');
                 $data['foto_menu'] = 'menu/' . $filename; // simpan path saja
             }
 
@@ -70,6 +70,7 @@ class MenuController extends Controller
             return back()->with('error', 'Gagal menyimpan: ' . $e->getMessage())->withInput();
         }
     }
+
     // 4. FORM EDIT MENU
     public function edit(Request $request, $id)
     {
@@ -102,13 +103,16 @@ class MenuController extends Controller
             // --- UPDATE FOTO JIKA ADA FILE BARU ---
             if ($request->hasFile('foto_menu')) {
                 // Hapus foto lama jika bukan URL internet
-                if ($menu->foto_menu) {
-                Storage::delete('public/' . $menu->foto_menu);
+                if ($menu->foto_menu && !str_starts_with($menu->foto_menu, 'http')) {
+                    // FIX: pakai disk 'public' secara eksplisit, path tanpa prefix 'public/'
+                    Storage::disk('public')->delete($menu->foto_menu);
                 }
 
                 $file = $request->file('foto_menu');
                 $filename = time() . '_' . str_replace(' ', '_', $request->nama_menu) . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('public/menu', $filename);
+
+                // FIX: sebutkan disk 'public' secara eksplisit (parameter ke-3)
+                $file->storeAs('menu', $filename, 'public');
                 $data['foto_menu'] = 'menu/' . $filename;
             }
 
@@ -116,7 +120,7 @@ class MenuController extends Controller
 
             // Redirection logic tetap dipertahankan
             $route = ($request->query('from') == 'stok') ? 'dashboard.restoran.stok' : 'dashboard.restoran.menu.index';
-            
+
             return redirect()->route($route)->with('success', 'Data menu berhasil diperbarui!');
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal memperbarui: ' . $e->getMessage());

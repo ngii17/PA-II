@@ -275,15 +275,22 @@ public function login(Request $request)
      * 9. HAPUS FOTO PROFIL (Langkah perbaikan Tombol Hapus)
      */
     public function deletePhoto(Request $request)
-    {
-        $user = $request->user();
-        if ($user->profile_photo) {
-            Storage::delete('public/profiles/' . $user->profile_photo);
-            $user->update(['profile_photo' => null]);
-            return response()->json(['success' => true, 'message' => 'Foto profil dihapus.']);
-        }
-        return response()->json(['success' => false, 'message' => 'Tidak ada foto untuk dihapus.'], 400);
+{
+    $user = $request->user();
+
+    if ($user->profile_photo) {
+        $user->update(['profile_photo' => null]);
+        return response()->json([
+            'success' => true, 
+            'message' => 'Foto profil dihapus.'
+        ]);
     }
+
+    return response()->json([
+        'success' => false, 
+        'message' => 'Tidak ada foto untuk dihapus.'
+    ], 400);
+}
 
 
 
