@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\restoran\PesananMenu;
-use App\Models\restoran\DetailPesanan;
-use App\Models\restoran\Menu;
-use App\Models\restoran\KategoriMenu;
+use App\Models\Restoran\PesananMenu;
+use App\Models\Restoran\DetailPesanan;
+use App\Models\Restoran\Menu;
+use App\Models\Restoran\KategoriMenu;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -38,7 +38,7 @@ public function getMenus()
             $activeEvent = Event::where('is_active', true)->first();
 
             // 2. Cari Promo Global Restoran (is_active = true)
-            $promoGlobal = \App\Models\hotel\Promo::where('kategori', 'restoran')
+            $promoGlobal = \App\Models\Hotel\Promo::where('kategori', 'restoran')
                 ->where('is_active', true)
                 ->whereNull('kode_promo')
                 ->whereDate('tgl_mulai', '<=', now())

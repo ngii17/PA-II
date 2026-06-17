@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\hotel\TipeKamar;
-use App\Models\hotel\Promo;
-use App\Models\hotel\Reservasi;
-use App\Models\hotel\DetailReservasi;
-use App\Models\hotel\Kamar;
-use App\Models\hotel\StatusReservasi;
+use App\Models\Hotel\TipeKamar;
+use App\Models\Hotel\Promo;
+use App\Models\Hotel\Reservasi;
+use App\Models\Hotel\DetailReservasi;
+use App\Models\Hotel\Kamar;
+use App\Models\Hotel\StatusReservasi;
 use App\Services\NotificationClientService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
