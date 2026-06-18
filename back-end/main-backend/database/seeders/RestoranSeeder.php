@@ -4,11 +4,11 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use App\Models\restoran\StatusMenu;
-use App\Models\restoran\StatusPesanan;
-use App\Models\restoran\KategoriMenu;
-use App\Models\restoran\Menu;
-use App\Models\hotel\Promo;
+use App\Models\Restoran\StatusMenu;
+use App\Models\Restoran\StatusPesanan;
+use App\Models\Restoran\KategoriMenu;
+use App\Models\Restoran\Menu;
+use App\Models\Hotel\Promo;
 
 class RestoranSeeder extends Seeder
 {
