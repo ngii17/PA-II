@@ -16,6 +16,8 @@ services:
     restart: always
     env_file:
       - ./main-backend/.env
+    volumes:
+      - main-backend-storage:/var/www/html/storage/app/public
     networks:
       - purnama-network
 
@@ -67,3 +69,6 @@ services:
 networks:
   purnama-network:
     driver: bridge
+
+volumes:
+  main-backend-storage:

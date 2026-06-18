@@ -592,6 +592,18 @@ textarea.form-control-premium {
                                           class="form-control-premium"
                                           rows="3">{{ old('deskripsi', $menu->deskripsi) }}</textarea>
                             </div>
+			    <!-- Stok -->
+<div class="col-md-6">
+    <label class="form-label-premium">
+        <i class="fas fa-boxes"></i> Stok
+    </label>
+    <input type="number"
+           name="stok"
+           class="form-control-premium"
+           value="{{ old('stok', $menu->stok) }}"
+           min="0"
+           required>
+</div>
                         </div>
 
                         <!-- Action Buttons -->
