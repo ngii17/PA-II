@@ -12,7 +12,7 @@ class AuthServiceHelper
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $token,
                 'Accept'        => 'application/json',
-            ])->get('http://localhost:8000/api/auth/me');
+            ])->get('http://auth-service:8000/api/auth/me');
 
             if ($response->successful() && $response->json('success')) {
                 return $response->json('user_id');

@@ -429,7 +429,7 @@ public function getMenus()
             $today = now()->format('Y-m-d');
 
             // --- QUERY DENGAN PENGECEKAN IS_ACTIVE ---
-            $promo = \App\Models\hotel\Promo::whereIn('kategori', ['restoran', 'semua'])
+            $promo = \App\Models\Hotel\Promo::whereIn('kategori', ['restoran', 'semua'])
                 ->where('is_active', true) // <--- SAKLAR UTAMA: Wajib Aktif
                 ->where(function($query) {
                     $query->whereNull('kode_promo')

@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 // --- IMPORT SEMUA MODEL (PASTIKAN TIDAK ADA YANG KURANG) ---
-use App\Models\hotel\UlasanHotel;
-use App\Models\hotel\Reservasi;
-use App\Models\hotel\TipeKamar;
+use App\Models\Hotel\UlasanHotel;
+use App\Models\Hotel\Reservasi;
+use App\Models\Hotel\TipeKamar;
 use App\Models\restoran\UlasanRestoran;
 use App\Models\restoran\PesananMenu;
 use App\Models\restoran\Menu;

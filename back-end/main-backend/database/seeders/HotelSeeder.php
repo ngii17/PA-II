@@ -4,11 +4,11 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use App\Models\hotel\StatusKamar;
-use App\Models\hotel\TipeKamar;
-use App\Models\hotel\StatusReservasi;
-use App\Models\hotel\Promo;
-use App\Models\hotel\Kamar;
+use App\Models\Hotel\StatusKamar;
+use App\Models\Hotel\TipeKamar;
+use App\Models\Hotel\StatusReservasi;
+use App\Models\Hotel\Promo;
+use App\Models\Hotel\Kamar;
 
 class HotelSeeder extends Seeder
 {

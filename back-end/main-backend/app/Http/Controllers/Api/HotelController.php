@@ -315,13 +315,13 @@ class HotelController extends Controller
 
         // Mulai sini sama seperti sebelumnya, tapi user_id dari token, BUKAN dari query param
         try {
-            $history = \App\Models\hotel\Reservasi::with(['details', 'tipeKamar'])
+            $history = \App\Models\Hotel\Reservasi::with(['details', 'tipeKamar'])
                 ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc')
                 ->get();
 
             $data = $history->map(function ($res) {
-                $review = \App\Models\hotel\UlasanHotel::where('reservasi_id', $res->id)->first();
+                $review = \App\Models\Hotel\UlasanHotel::where('reservasi_id', $res->id)->first();
 
                 return [
                     'id'                  => $res->id,
@@ -367,12 +367,12 @@ class HotelController extends Controller
 
             // --- A. JIKA TRANSAKSI HOTEL (INV) ---
             if ($prefix == 'INV') {
-                $reservasi = \App\Models\hotel\Reservasi::with('tipeKamar')->find($actualId);
+                $reservasi = \App\Models\Hotel\Reservasi::with('tipeKamar')->find($actualId);
 
                 if ($reservasi) {
                     if ($request->transaction_status == 'capture' || $request->transaction_status == 'settlement') {
 
-                        $kamar = \App\Models\hotel\Kamar::where('tipe_kamar_id', $reservasi->tipe_kamar_id)
+                        $kamar = \App\Models\Hotel\Kamar::where('tipe_kamar_id', $reservasi->tipe_kamar_id)
                                              ->where('status_kamar_id', 1)->first();
 
                         // Update status lunas & penempatan kamar
@@ -473,7 +473,7 @@ else if ($prefix == 'RESTO') {
 
         try {
             // 2. Cari data reservasi
-            $reservasi = \App\Models\hotel\Reservasi::find($id);
+            $reservasi = \App\Models\Hotel\Reservasi::find($id);
 
             if (!$reservasi) {
                 return response()->json(['success' => false, 'message' => 'Data reservasi tidak ditemukan.'], 404);
@@ -485,7 +485,7 @@ else if ($prefix == 'RESTO') {
             }
 
             // 3. Cari unit kamar fisik yang masih status 1 (Tersedia) sesuai tipe yang dipesan
-            $kamarTersedia = \App\Models\hotel\Kamar::where('tipe_kamar_id', $reservasi->tipe_kamar_id)
+            $kamarTersedia = \App\Models\Hotel\Kamar::where('tipe_kamar_id', $reservasi->tipe_kamar_id)
                                   ->where('status_kamar_id', 1)
                                   ->first();
 
@@ -548,7 +548,7 @@ else if ($prefix == 'RESTO') {
     {
         try {
             // Cari reservasi beserta data kamar fisiknya menggunakan relasi 'kamar'
-            $reservasi = \App\Models\hotel\Reservasi::with('kamar')->find($id);
+            $reservasi = \App\Models\Hotel\Reservasi::with('kamar')->find($id);
             
             if (!$reservasi) {
                 return response()->json([

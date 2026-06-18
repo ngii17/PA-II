@@ -4,9 +4,10 @@ FROM php:8.2-fpm
 RUN apt-get update && apt-get install -y \
     git curl zip unzip libpq-dev libonig-dev libssl-dev \
     libzip-dev libxml2-dev libpng-dev libjpeg-dev libfreetype6-dev \
+    libcurl4-openssl-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo pdo_pgsql pgsql mbstring opcache \
-        gd zip xml curl bcmath \
+        gd zip xml bcmath \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
