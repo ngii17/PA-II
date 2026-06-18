@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\restoran\PesananMenu;
+use App\Models\Restoran\PesananMenu;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;

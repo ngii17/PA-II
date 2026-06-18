@@ -2,7 +2,7 @@
 
 namespace App\Exports;
 
-use App\Models\hotel\Reservasi;
+use App\Models\Hotel\Reservasi;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
