@@ -534,7 +534,7 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
     <!-- Stats Strip (dihitung dari data $menu) -->
     @php
         $totalMenu = $menu->count();
-        $totalKategori = $menu->pluck('kategori_id')->unique()->count();
+        $totalKategori = $menu->pluck('kategori_menu_id')->unique()->count();
         $menuAktif = $menu->where('status_menu_id', 1)->count();
         $totalNilai = $menu->sum('harga');
     @endphp

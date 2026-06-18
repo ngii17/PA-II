@@ -451,17 +451,17 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
                     'gradient' => 'linear-gradient(135deg, #0C2D6B 0%, #1a4a9c 50%, #C9A227 100%)',
                     'icon'     => 'fa-hotel',
                 ],
-                'idul_fitri' => [
+                'lebaran' => [
                     'name'     => 'Lebaran Bersama Purnama',
                     'gradient' => 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 60%, #FFD700 100%)',
                     'icon'     => 'fa-moon',
                 ],
-                'natal_tahun_baru' => [
+                'natal' => [
                     'name'     => 'Christmas & New Year Purnama',
                     'gradient' => 'linear-gradient(135deg, #B71C1C 0%, #C62828 50%, #2E7D32 100%)',
                     'icon'     => 'fa-tree',
                 ],
-                'kemerdekaan' => [
+                'hut_ri' => [
                     'name'     => 'HUT RI Purnama',
                     'gradient' => 'linear-gradient(135deg, #C62828 0%, #E53935 60%, #F5F5F5 100%)',
                     'icon'     => 'fa-flag',
