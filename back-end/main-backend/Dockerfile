@@ -26,6 +26,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
+RUN rm -rf /var/www/html/public/storage && \
+    ln -s /var/www/html/storage/app/public /var/www/html/public/storage
+
 EXPOSE 8001
 
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8001"]
