@@ -86,6 +86,10 @@ Route::middleware(['dashboard'])->prefix('dashboard')->group(function () {
         // meski status_kamar_id = 2 (Terisi)
         Route::get('/get-available-rooms/{tipe_id}/{current_kamar_id?}', [ReservasiHotelController::class, 'getAvailableRooms'])->name('dashboard.hotel.reservasi.getRooms');
 
+        // TAMBAHKAN INI ↓
+        Route::post('/reservasi/check-voucher', [ReservasiHotelController::class, 'checkVoucher'])
+            ->name('dashboard.hotel.reservasi.checkVoucher');
+
         Route::resource('tipe-kamar', TipeKamarController::class)->names('dashboard.hotel.tipe-kamar');
         Route::resource('kamar', KamarController::class)->names('dashboard.hotel.kamar');
         Route::resource('reservasi', ReservasiHotelController::class)->names('dashboard.hotel.reservasi');
@@ -94,6 +98,7 @@ Route::middleware(['dashboard'])->prefix('dashboard')->group(function () {
         
         Route::get('/ulasan', [UlasanHotelController::class, 'index'])->name('dashboard.hotel.ulasan');
         Route::patch('/ulasan/{id}/toggle', [UlasanController::class, 'toggle'])->name('dashboard.ulasan.hotel.toggle');
+
     });
 
 

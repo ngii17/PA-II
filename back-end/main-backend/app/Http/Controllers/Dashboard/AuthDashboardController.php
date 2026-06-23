@@ -19,48 +19,47 @@ class AuthDashboardController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'email'    => 'required|email',
             'password' => 'required',
         ]);
 
         try {
-            // Panggil API Auth-Service (Port 8000)
             $response = Http::post(env('MIKRO_URL') . '/api/login', [
-                'email' => $request->email,
+                'email'    => $request->email,
                 'password' => $request->password,
             ]);
 
             $data = $response->json();
 
             if ($response->successful() && isset($data['access_token'])) {
-                $user = $data['user'];
-
-                // Role Mapping
+                $user    = $data['user'];
                 $roleMap = [1 => 'admin', 3 => 'staff_hotel', 4 => 'staff_restoran'];
-                $role = $roleMap[$user['role_id']] ?? null;
+                $role    = $roleMap[$user['role_id']] ?? null;
 
                 if (!$role) {
-                    return back()->withErrors(['email' => 'Anda tidak memiliki akses ke dashboard.']);
+                    return back()->withErrors(['email' => 'Anda tidak memiliki akses ke dashboard.'])->withInput();
                 }
 
-                // Simpan Session
                 session(['user' => [
-                    'id' => $user['id'],
-                    'name' => $user['full_name'],
-                    'role' => $role,
+                    'id'    => $user['id'],
+                    'name'  => $user['full_name'],
+                    'role'  => $role,
                     'token' => $data['access_token'],
                 ]]);
 
                 return redirect('/dashboard');
             }
 
-            return back()->withErrors(['email' => 'Email atau password salah.']);
+            // Baca error_type dari response auth-service
+            $errorType = $data['error_type'] ?? 'email';
+            $errorMsg  = $data['message'] ?? 'Terjadi kesalahan, coba lagi.';
+
+            return back()->withErrors([$errorType => $errorMsg])->withInput();
 
         } catch (\Exception $e) {
-            return back()->withErrors(['email' => 'Gagal terhubung ke Auth-Service.']);
+            return back()->withErrors(['email' => 'Gagal terhubung ke Auth-Service.'])->withInput();
         }
     }
-
     public function logout()
     {
         session()->forget('user');
