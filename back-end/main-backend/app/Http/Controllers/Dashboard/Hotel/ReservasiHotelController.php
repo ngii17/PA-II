@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use App\Services\NotificationClientService;
+use App\Models\Hotel\DetailReservasi;
 
 class ReservasiHotelController extends Controller
 {
@@ -56,72 +57,170 @@ class ReservasiHotelController extends Controller
         $tipeKamar = TipeKamar::all();
         $kamar = Kamar::with('tipeKamar')->where('status_kamar_id', 1)->get();
         $statusList = StatusReservasi::all();
-        return view('dashboard.hotel.reservasi.create', compact('customers', 'tipeKamar', 'kamar', 'statusList'));
+
+        $promoOtomatis = Promo::where('kategori', 'hotel')
+            ->where('is_active', true)
+            ->whereNull('kode_promo')
+            ->whereDate('tgl_mulai', '<=', now())
+            ->whereDate('tgl_selesai', '>=', now())
+            ->get();
+
+        return view('dashboard.hotel.reservasi.create', compact(
+            'customers', 'tipeKamar', 'kamar', 'statusList', 'promoOtomatis'
+        ));
+    }
+
+    public function checkVoucher(Request $request)
+    {
+        $request->validate(['kode' => 'required|string']);
+
+        $promo = Promo::where('kategori', 'hotel')
+            ->where('is_active', true)
+            ->where('kode_promo', $request->kode)
+            ->whereDate('tgl_mulai', '<=', now())
+            ->whereDate('tgl_selesai', '>=', now())
+            ->first();
+
+        if (!$promo) {
+            return response()->json([
+                'valid'   => false,
+                'message' => 'Kode voucher tidak ditemukan, sudah expired, atau tidak aktif.',
+            ]);
+        }
+
+        return response()->json([
+            'valid'            => true,
+            'promo_id'         => $promo->id,
+            'nama_promo'       => $promo->nama_promo,
+            'tipe_diskon'      => $promo->tipe_diskon,
+            'nominal_potongan' => $promo->nominal_potongan,
+        ]);
     }
 
     // 4. SIMPAN RESERVASI BARU
     public function store(Request $request)
     {
+        $isWalkin = $request->input('tipe_tamu') === 'walkin';
+
         $request->validate([
-            'user_id'             => 'required',
+            'tipe_tamu'           => 'required|in:terdaftar,walkin',
+            'user_id'             => $isWalkin ? 'nullable' : 'required',
             'tipe_kamar_id'       => 'required|exists:tipe_kamar,id',
             'kamar_id'            => 'required|exists:kamar,id',
             'tgl_checkin'         => 'required|date',
             'tgl_checkout'        => 'required|date|after:tgl_checkin',
             'status_reservasi_id' => 'required|exists:status_reservasi,id',
+            'nama_tamu'           => 'required|string|max:255',
+            'nik_identitas'       => 'required|digits:16',
+            'jumlah_tamu'         => 'required|integer|min:1',
+            'promo_id'            => 'nullable|exists:promo,id',
+            'kode_voucher'        => 'nullable|string|max:50',
         ]);
+
+        DB::beginTransaction();
         try {
             $tipeKamar = TipeKamar::findOrFail($request->tipe_kamar_id);
 
-            // --- SINKRONISASI HARGA PROMO ---
-            $promoAktif = Promo::where('kategori', 'hotel')->where('is_active', true)
-                ->whereNull('kode_promo')->whereDate('tgl_mulai', '<=', now())
-                ->whereDate('tgl_selesai', '>=', now())->first();
-            $hargaPerMalam = $tipeKamar->harga;
-            if ($promoAktif) {
-                $potongan = ($promoAktif->tipe_diskon == 'persen')
-                    ? $hargaPerMalam * ($promoAktif->nominal_potongan / 100)
-                    : $promoAktif->nominal_potongan;
-                $hargaPerMalam = $hargaPerMalam - $potongan;
+            $checkIn  = \Carbon\Carbon::parse($request->tgl_checkin);
+            $checkOut = \Carbon\Carbon::parse($request->tgl_checkout);
+            $malam    = $checkIn->diffInDays($checkOut);
+            $malam    = ($malam < 1) ? 1 : $malam;
+            $subtotal = $malam * $tipeKamar->harga;
+
+            // --- TENTUKAN PROMO/VOUCHER ---
+            $promoTerpakai = null;
+
+            if ($request->filled('kode_voucher')) {
+                $promoTerpakai = Promo::where('kategori', 'hotel')
+                    ->where('is_active', true)
+                    ->where('kode_promo', $request->kode_voucher)
+                    ->whereDate('tgl_mulai', '<=', now())
+                    ->whereDate('tgl_selesai', '>=', now())
+                    ->first();
+
+                if (!$promoTerpakai) {
+                    DB::rollback();
+                    return back()->withErrors(['kode_voucher' => 'Kode voucher tidak valid atau sudah expired.'])->withInput();
+                }
+            } elseif ($request->filled('promo_id')) {
+                $promoTerpakai = Promo::where('id', $request->promo_id)
+                    ->where('kategori', 'hotel')
+                    ->where('is_active', true)
+                    ->whereNull('kode_promo')
+                    ->whereDate('tgl_mulai', '<=', now())
+                    ->whereDate('tgl_selesai', '>=', now())
+                    ->first();
             }
-            $checkIn    = \Carbon\Carbon::parse($request->tgl_checkin);
-            $checkOut   = \Carbon\Carbon::parse($request->tgl_checkout);
-            $malam      = $checkIn->diffInDays($checkOut);
-            $malam      = ($malam < 1) ? 1 : $malam;
-            $totalHarga = $malam * $hargaPerMalam;
-            Reservasi::create([
-                'user_id'             => $request->user_id,
-                'tipe_kamar_id'       => $request->tipe_kamar_id,
-                'kamar_id'            => $request->kamar_id,
-                'tgl_checkin'         => $request->tgl_checkin,
-                'tgl_checkout'        => $request->tgl_checkout,
-                'total_malam'         => $malam,
-                'total_harga'         => $totalHarga,
-                'status_reservasi_id' => $request->status_reservasi_id,
-                'metode_pembayaran'   => 'Manual (Resepsionis)',
+
+            $diskon = 0;
+            if ($promoTerpakai) {
+                $diskon = ($promoTerpakai->tipe_diskon == 'persen')
+                    ? $subtotal * ($promoTerpakai->nominal_potongan / 100)
+                    : $promoTerpakai->nominal_potongan;
+                $diskon = min($diskon, $subtotal);
+            }
+
+            $totalHarga = $subtotal - $diskon;
+
+            $reservasi = Reservasi::create([
+                'user_id'                => $isWalkin ? null : $request->user_id,
+                'tipe_kamar_id'          => $request->tipe_kamar_id,
+                'kamar_id'               => $request->kamar_id,
+                'tgl_checkin'            => $request->tgl_checkin,
+                'tgl_checkout'           => $request->tgl_checkout,
+                'total_malam'            => $malam,
+                'total_harga'            => $totalHarga,
+                'status_reservasi_id'    => $request->status_reservasi_id,
+                'metode_pembayaran'      => 'Manual (Resepsionis)',
+                'promo_id'               => $promoTerpakai->id ?? null,
+                'kode_voucher_digunakan' => ($promoTerpakai && $promoTerpakai->kode_promo) ? $promoTerpakai->kode_promo : null,
+                'nominal_diskon'         => $diskon,
             ]);
+
+            DetailReservasi::create([
+                'reservasi_id'  => $reservasi->id,
+                'nama_tamu'     => $request->nama_tamu,
+                'nik_identitas' => $request->nik_identitas,
+                'jumlah_tamu'   => $request->jumlah_tamu,
+            ]);
+
+            DB::commit();
             return redirect()->route('dashboard.hotel.reservasi.index')->with('success', 'Reservasi berhasil dibuat.');
+
         } catch (\Exception $e) {
+            DB::rollback();
             return back()->withErrors(['error' => 'Gagal: ' . $e->getMessage()])->withInput();
         }
     }
-
     // 5. FORM EDIT
     public function edit($id)
     {
-        $reservasi      = Reservasi::findOrFail($id);
+        $token          = session('user.token');
+        $response       = Http::withToken($token)->get(env('MIKRO_URL') . '/api/users');
+        $users          = collect($response->json('data') ?? [])->keyBy('id');
+        $reservasi      = Reservasi::with('details')->findOrFail($id);
         $tipeKamar      = TipeKamar::all();
         $kamar          = Kamar::all();
         $statusList     = StatusReservasi::all();
         $currentKamarId = $reservasi->kamar_id;
         return view('dashboard.hotel.reservasi.edit', compact(
-            'reservasi', 'tipeKamar', 'kamar', 'statusList', 'currentKamarId'
+            'reservasi', 'tipeKamar', 'kamar', 'statusList', 'currentKamarId', 'users'
         ));
     }
-
-    // 6. UPDATE (LOGIKA NOTIFIKASI & MANAGEMENT KAMAR)
-    public function update(Request $request, $id)
+        // 6. UPDATE (LOGIKA NOTIFIKASI & MANAGEMENT KAMAR)
+        public function update(Request $request, $id)
     {
+        $request->validate([
+            'tipe_kamar_id'       => 'required|exists:tipe_kamar,id',
+            'kamar_id'            => 'required|exists:kamar,id',
+            'tgl_checkin'         => 'required|date',
+            'tgl_checkout'        => 'required|date|after:tgl_checkin',
+            'status_reservasi_id' => 'required|exists:status_reservasi,id',
+            'nama_tamu'           => 'required|string|max:255',
+            'nik_identitas'       => 'nullable|string|max:20',
+            'jumlah_tamu'         => 'required|integer|min:1',
+        ]);
+
         $reservasi   = Reservasi::findOrFail($id);
         $statusLama  = $reservasi->status_reservasi_id;
         $kamarLamaId = $reservasi->kamar_id;
@@ -134,8 +233,8 @@ class ReservasiHotelController extends Controller
             // ----------------------------------------------------------------
             if ($request->status_reservasi_id == 3 && $statusLama != 3) {
                 $kamarSudahTerpakai = Reservasi::where('kamar_id', $request->kamar_id)
-                    ->where('status_reservasi_id', 3)   // sedang CHECK-IN aktif
-                    ->where('id', '!=', $id)             // bukan reservasi ini sendiri
+                    ->where('status_reservasi_id', 3)
+                    ->where('id', '!=', $id)
                     ->exists();
 
                 if ($kamarSudahTerpakai) {
@@ -154,6 +253,27 @@ class ReservasiHotelController extends Controller
                 'status_reservasi_id' => $request->status_reservasi_id,
             ]);
 
+            // --- UPDATE DATA TAMU ---
+            $detail = $reservasi->details()->first();
+            if ($detail) {
+                $updateData = [
+                    'nama_tamu'   => $request->nama_tamu,
+                    'jumlah_tamu' => $request->jumlah_tamu,
+                ];
+                // Hanya update NIK kalau tidak kosong dan tidak mengandung * (masked)
+                if ($request->filled('nik_identitas') && !str_contains($request->nik_identitas, '*')) {
+                    $updateData['nik_identitas'] = $request->nik_identitas;
+                }
+                $detail->update($updateData);
+            } else {
+                DetailReservasi::create([
+                    'reservasi_id'  => $reservasi->id,
+                    'nama_tamu'     => $request->nama_tamu,
+                    'nik_identitas' => $request->nik_identitas,
+                    'jumlah_tamu'   => $request->jumlah_tamu,
+                ]);
+            }
+
             // --- MANAJEMEN STATUS KAMAR FISIK ---
 
             // A. Jika Status berubah jadi CHECK-IN (ID 3)
@@ -170,7 +290,6 @@ class ReservasiHotelController extends Controller
 
             // B. Jika Status berubah jadi SELESAI/CHECK-OUT (ID 4)
             if ($statusLama != 4 && $request->status_reservasi_id == 4) {
-                // FIX: Gunakan $kamarLamaId (diambil sebelum update) agar selalu benar
                 Kamar::where('id', $kamarLamaId)->update(['status_kamar_id' => 1]);
 
                 $this->notifService->sendCheckoutSuccess(
@@ -182,6 +301,7 @@ class ReservasiHotelController extends Controller
 
             DB::commit();
             return redirect()->route('dashboard.hotel.reservasi.index')->with('success', 'Data diperbarui & Notifikasi dikirim.');
+
         } catch (\Exception $e) {
             DB::rollback();
             Log::error("Hotel Dashboard Error: " . $e->getMessage());

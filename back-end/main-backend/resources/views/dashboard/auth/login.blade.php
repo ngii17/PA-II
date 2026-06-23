@@ -465,9 +465,15 @@
                 <div class="card-desc">Silakan masukkan kredensial Anda</div>
             </div>
 
-            @if($errors->any())
+            @if($errors->has('email'))
                 <div class="alert-premium">
-                    <i class="fas fa-circle-exclamation me-2"></i> {{ $errors->first() }}
+                    <i class="fas fa-circle-exclamation me-2"></i> {{ $errors->first('email') }}
+                </div>
+            @endif
+
+            @if($errors->has('password'))
+                <div class="alert-premium">
+                    <i class="fas fa-circle-exclamation me-2"></i> {{ $errors->first('password') }}
                 </div>
             @endif
 

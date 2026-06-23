@@ -113,27 +113,36 @@ class AuthController extends Controller
     /**
      * 3. LOGIN
      */
-public function login(Request $request)
+    public function login(Request $request)
     {
-        // 1. Tambahkan fcm_token dalam validasi (nullable agar tidak error jika testing tanpa token)
         $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+            'email'     => 'required|email',
+            'password'  => 'required',
             'fcm_token' => 'nullable|string'
         ]);
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['success' => false, 'message' => 'Email atau Password salah.'], 401);
+        // Pisah: email tidak ditemukan
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email tidak terdaftar.',
+                'error_type' => 'email'
+            ], 401);
         }
 
-        // --- 2. UPDATE FCM TOKEN USER DISINI ---
-        // Setiap kali login, kita simpan token HP terbaru agar alamat broadcast tidak basi
+        // Pisah: password salah
+        if (!Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password yang Anda masukkan salah.',
+                'error_type' => 'password'
+            ], 401);
+        }
+
         if ($request->has('fcm_token') && $request->fcm_token != null) {
-            $user->update([
-                'fcm_token' => $request->fcm_token
-            ]);
+            $user->update(['fcm_token' => $request->fcm_token]);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -143,8 +152,7 @@ public function login(Request $request)
             'access_token' => $token,
             'user'         => $user
         ], 200);
-    }
-    /**
+    }    /**
      * 4. FORGOT PASSWORD
      */
     public function forgotPassword(Request $request)

@@ -329,12 +329,62 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
                                 <i class="fas fa-user me-1"></i> PELANGGAN
                             </label>
                             @php $user = $users[$reservasi->user_id] ?? null; @endphp
-                            <input type="text" class="form-control-premium" value="{{ $user['full_name'] ?? 'Tamu #'.$reservasi->user_id }} (ID: {{ $reservasi->user_id }})" readonly disabled>
+                            @if($reservasi->user_id && $user)
+                                <input type="text" class="form-control-premium"
+                                    value="{{ $user['full_name'] ?? 'Tamu #'.$reservasi->user_id }} ({{ $user['email'] ?? '' }})"
+                                    readonly disabled>
+                            @else
+                                <input type="text" class="form-control-premium"
+                                    value="Tamu Walk-in (Tanpa Akun)"
+                                    readonly disabled>
+                            @endif
                             <div class="form-text-premium">
-                                <i class="fas fa-info-circle text-info"></i> Notifikasi WhatsApp akan dikirim otomatis ke pelanggan jika status diubah.
+                                <i class="fas fa-info-circle text-info"></i>
+                                @if($reservasi->user_id)
+                                    Notifikasi WhatsApp akan dikirim otomatis ke pelanggan jika status diubah.
+                                @else
+                                    Tamu walk-in — tidak ada akun terdaftar, notifikasi tidak akan dikirim.
+                                @endif
                             </div>
                         </div>
 
+                        {{-- Data Tamu --}}
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-8">
+                                <label class="form-label-premium"><i class="fas fa-id-card"></i> NAMA TAMU SESUAI KTP</label>
+                                <input type="text" name="nama_tamu" id="nama_tamu"
+                                    class="form-control-premium @error('nama_tamu') is-invalid @enderror"
+                                    placeholder="Contoh: Budi Santoso"
+                                    value="{{ old('nama_tamu', $reservasi->details->first()->nama_tamu ?? '') }}" required>
+                                @error('nama_tamu') <div class="invalid-feedback-premium"><i class="fas fa-times-circle"></i> {{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label-premium"><i class="fas fa-users"></i> JUMLAH TAMU</label>
+                                <input type="number" name="jumlah_tamu" id="jumlah_tamu"
+                                    class="form-control-premium @error('jumlah_tamu') is-invalid @enderror"
+                                    min="1" value="{{ old('jumlah_tamu', $reservasi->details->first()->jumlah_tamu ?? 1) }}" required>
+                                @error('jumlah_tamu') <div class="invalid-feedback-premium"><i class="fas fa-times-circle"></i> {{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label-premium"><i class="fas fa-id-badge"></i> NIK / KTP</label>
+                                <input type="text" name="nik_identitas" id="nik_identitas"
+                                    class="form-control-premium @error('nik_identitas') is-invalid @enderror"
+                                    placeholder="16 digit NIK" maxlength="16" inputmode="numeric"
+                                    value="{{ old('nik_identitas', session('user.role') === 'admin' 
+                                        ? ($reservasi->details->first()->nik_identitas ?? '') 
+                                        : (strlen($reservasi->details->first()->nik_identitas ?? '') >= 8 
+                                            ? substr($reservasi->details->first()->nik_identitas, 0, 4) . str_repeat('*', strlen($reservasi->details->first()->nik_identitas) - 8) . substr($reservasi->details->first()->nik_identitas, -4)
+                                            : str_repeat('*', strlen($reservasi->details->first()->nik_identitas ?? '')))
+                                    ) }}"required>
+                                @error('nik_identitas') <div class="invalid-feedback-premium"><i class="fas fa-times-circle"></i> {{ $message }}</div> @enderror
+                                {{-- TAMBAH INI TEPAT DI SINI ↓ --}}
+                                @if(session('user.role') !== 'admin')
+                                    <div class="form-text-premium">
+                                        <i class="fas fa-lock text-warning"></i> NIK disamarkan. Kosongkan field ini jika tidak ingin mengubah NIK, atau ketik NIK baru untuk menggantinya.
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
                         <div class="row g-3">
                             {{-- Tipe Kamar --}}
                             <div class="col-md-6">

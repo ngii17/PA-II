@@ -357,9 +357,27 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
 
                         <div class="row g-3">
                             {{-- Pilih Pelanggan --}}
+                            {{-- TIPE PEMESANAN: Pelanggan Terdaftar vs Walk-in --}}
                             <div class="col-12">
-                                <label class="form-label-premium"><i class="fas fa-user"></i> NAMA TAMU (PELANGGAN)</label>
-                                <select name="user_id" id="user_id" class="form-select-premium @error('user_id') is-invalid @enderror" required>
+                                <label class="form-label-premium"><i class="fas fa-user-tag"></i> TIPE TAMU</label>
+                                <div style="display:flex; gap:12px;">
+                                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="radio" name="tipe_tamu" id="tipe_tamu_terdaftar" value="terdaftar" 
+                                            {{ old('tipe_tamu', 'terdaftar') == 'terdaftar' ? 'checked' : '' }}>
+                                        <span>Pelanggan Terdaftar (Punya Akun)</span>
+                                    </label>
+                                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                                        <input type="radio" name="tipe_tamu" id="tipe_tamu_walkin" value="walkin"
+                                            {{ old('tipe_tamu') == 'walkin' ? 'checked' : '' }}>
+                                        <span>Tamu Walk-in (Tanpa Akun)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {{-- Dropdown pelanggan terdaftar --}}
+                            <div class="col-12" id="sectionPelangganTerdaftar">
+                                <label class="form-label-premium"><i class="fas fa-users"></i> PILIH PELANGGAN TERDAFTAR</label>
+                                <select name="user_id" id="user_id" class="form-select-premium">
                                     <option value="">-- Pilih Pelanggan Terdaftar --</option>
                                     @foreach($customers as $c)
                                         <option value="{{ $c['id'] }}" {{ old('user_id') == $c['id'] ? 'selected' : '' }}>
@@ -367,10 +385,68 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="form-text-premium"><i class="fas fa-info-circle text-info"></i> Tamu harus sudah memiliki akun pelanggan.</div>
                                 @error('user_id') <div class="invalid-feedback-premium"><i class="fas fa-times-circle"></i> {{ $message }}</div> @enderror
                             </div>
 
+                            {{-- Input walk-in (hidden by default) --}}
+                            <div class="col-12" id="sectionWalkin" style="display:none;">
+                                <div class="p-3 rounded-3" style="background: #fff8e1; border-left: 3px solid var(--amber);">
+                                    <small><i class="fas fa-info-circle text-warning"></i> <strong>Tamu Walk-in:</strong> Data tamu diambil dari field Nama & NIK di bawah. Tidak perlu pilih akun.</small>
+                                </div>
+                            </div>
+                                                        {{-- DATA TAMU --}}
+                            <div class="col-md-8">
+                                <label class="form-label-premium"><i class="fas fa-id-card"></i> NAMA TAMU SESUAI KTP</label>
+                                <input type="text" name="nama_tamu" id="nama_tamu"
+                                    class="form-control-premium @error('nama_tamu') is-invalid @enderror"
+                                    placeholder="Contoh: Budi Santoso"
+                                    value="{{ old('nama_tamu') }}" required>
+                                @error('nama_tamu') <div class="invalid-feedback-premium"><i class="fas fa-times-circle"></i> {{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label-premium"><i class="fas fa-users"></i> JUMLAH TAMU</label>
+                                <input type="number" name="jumlah_tamu" id="jumlah_tamu"
+                                    class="form-control-premium @error('jumlah_tamu') is-invalid @enderror"
+                                    min="1" value="{{ old('jumlah_tamu', 1) }}" required>
+                                @error('jumlah_tamu') <div class="invalid-feedback-premium"><i class="fas fa-times-circle"></i> {{ $message }}</div> @enderror
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label-premium"><i class="fas fa-id-badge"></i> NIK / KTP</label>
+                                <input type="text" name="nik_identitas" id="nik_identitas"
+                                    class="form-control-premium @error('nik_identitas') is-invalid @enderror"
+                                    placeholder="16 digit NIK" maxlength="16" inputmode="numeric"
+                                    value="{{ old('nik_identitas') }}" required>
+                                @error('nik_identitas') <div class="invalid-feedback-premium"><i class="fas fa-times-circle"></i> {{ $message }}</div> @enderror
+                            </div>
+
+                            {{-- PROMO & VOUCHER --}}
+                            <div class="col-md-6">
+                                <label class="form-label-premium"><i class="fas fa-tags"></i> PROMO OTOMATIS (OPSIONAL)</label>
+                                <select name="promo_id" id="promo_id" class="form-select-premium">
+                                    <option value="">-- Tanpa Promo --</option>
+                                    @foreach($promoOtomatis as $p)
+                                        <option value="{{ $p->id }}" {{ old('promo_id') == $p->id ? 'selected' : '' }}
+                                                data-tipe="{{ $p->tipe_diskon }}" data-nominal="{{ $p->nominal_potongan }}">
+                                            {{ $p->nama_promo }} ({{ $p->tipe_diskon == 'persen' ? $p->nominal_potongan.'%' : 'Rp '.number_format($p->nominal_potongan,0,',','.') }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @if($promoOtomatis->isEmpty())
+                                    <div class="form-text-premium"><i class="fas fa-info-circle text-info"></i> Tidak ada promo otomatis aktif saat ini.</div>
+                                @endif
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label-premium"><i class="fas fa-ticket-alt"></i> KODE VOUCHER (OPSIONAL)</label>
+                                <div style="display:flex; gap:8px;">
+                                    <input type="text" name="kode_voucher" id="kode_voucher" class="form-control-premium"
+                                        placeholder="Masukkan kode voucher" value="{{ old('kode_voucher') }}" style="text-transform:uppercase;">
+                                    <button type="button" id="btnCekVoucher" class="btn-premium-secondary" style="padding:12px 18px; white-space:nowrap;">
+                                        <i class="fas fa-check"></i> Cek
+                                    </button>
+                                </div>
+                                <div class="form-text-premium" id="voucherFeedback"></div>
+                                <div class="form-text-premium"><i class="fas fa-info-circle text-info"></i> Kalau voucher valid, ini menggantikan promo otomatis di atas.</div>
+                            </div>
                             {{-- Tipe Kamar --}}
                             <div class="col-md-6">
                                 <label class="form-label-premium"><i class="fas fa-hotel"></i> TIPE KAMAR</label>
@@ -462,7 +538,15 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
                         <div class="preview-row"><span class="preview-label">Harga per Malam</span><span class="preview-value" id="previewHarga">Rp 0</span></div>
                         <div class="preview-row"><span class="preview-label">Jumlah Malam</span><span class="preview-value" id="previewMalam">0 malam</span></div>
                         <div class="preview-row"><span class="preview-label">Tanggal</span><span class="preview-value" id="previewTanggal">-</span></div>
-                        <div class="preview-row"><span class="preview-label fw-bold">TOTAL BIAYA</span><span class="preview-value total fw-bold" id="previewTotal">Rp 0</span></div>
+                        <div class="preview-row"><span class="preview-label">Subtotal</span><span class="preview-value" id="previewTotal">Rp 0</span></div>
+                        <div class="preview-row" id="previewDiskonRow" style="display:none;">
+                            <span class="preview-label" style="color: var(--rose);">Diskon</span>
+                            <span class="preview-value" id="previewDiskon" style="color: var(--rose);">- Rp 0</span>
+                        </div>
+                        <div class="preview-row">
+                            <span class="preview-label fw-bold">TOTAL AKHIR</span>
+                            <span class="preview-value total fw-bold" id="previewTotalAkhir">Rp 0</span>
+                        </div>                    
                     </div>
 
                     <div class="mt-3 p-3 rounded-3" style="background: #fff3e0; border-left: 3px solid var(--amber);">
@@ -482,7 +566,6 @@ body, input, select, textarea, button, label { font-family: var(--font) !importa
 {{-- JAVASCRIPT --}}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Animasi Cards
     const cards = document.querySelectorAll('.card-premium');
     cards.forEach((card, idx) => {
         card.style.opacity = '0';
@@ -493,7 +576,7 @@ document.addEventListener('DOMContentLoaded', function() {
             card.style.transform = 'translateY(0)';
         }, 100 + (idx * 80));
     });
-    
+
     const header = document.querySelector('.create-header');
     if (header) {
         header.style.opacity = '0';
@@ -505,52 +588,164 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 50);
     }
 
-    // Preview Elements
-    const tipeSelect = document.getElementById('tipe_kamar_id');
-    const tglCheckin = document.getElementById('tgl_checkin');
-    const tglCheckout = document.getElementById('tgl_checkout');
-    const previewTipe = document.getElementById('previewTipeKamar');
-    const previewHarga = document.getElementById('previewHarga');
-    const previewMalam = document.getElementById('previewMalam');
-    const previewTanggal = document.getElementById('previewTanggal');
-    const previewTotal = document.getElementById('previewTotal');
+    const tipeSelect       = document.getElementById('tipe_kamar_id');
+    const tglCheckin       = document.getElementById('tgl_checkin');
+    const tglCheckout      = document.getElementById('tgl_checkout');
+    const promoSelect      = document.getElementById('promo_id');
+    const voucherInput     = document.getElementById('kode_voucher');
+    const btnCekVoucher    = document.getElementById('btnCekVoucher');
+    const voucherFeedback  = document.getElementById('voucherFeedback');
+
+    const previewTipe       = document.getElementById('previewTipeKamar');
+    const previewHarga      = document.getElementById('previewHarga');
+    const previewMalam      = document.getElementById('previewMalam');
+    const previewTanggal    = document.getElementById('previewTanggal');
+    const previewTotal      = document.getElementById('previewTotal');
+    const previewDiskonRow  = document.getElementById('previewDiskonRow');
+    const previewDiskon     = document.getElementById('previewDiskon');
+    const previewTotalAkhir = document.getElementById('previewTotalAkhir');
+
+    let discountInfo = { value: 0, isPercent: false, source: null };
+    let currentSubtotal = 0;
+
+    // --- TOGGLE TIPE TAMU ---
+    const radioTerdaftar   = document.getElementById('tipe_tamu_terdaftar');
+    const radioWalkin      = document.getElementById('tipe_tamu_walkin');
+    const sectionTerdaftar = document.getElementById('sectionPelangganTerdaftar');
+    const sectionWalkin    = document.getElementById('sectionWalkin');
+    const userIdSelect     = document.getElementById('user_id');
+
+    function toggleTipeTamu() {
+        if (radioWalkin.checked) {
+            sectionTerdaftar.style.display = 'none';
+            sectionWalkin.style.display = 'block';
+            userIdSelect.value = '';
+            userIdSelect.removeAttribute('required');
+        } else {
+            sectionTerdaftar.style.display = 'block';
+            sectionWalkin.style.display = 'none';
+            userIdSelect.setAttribute('required', 'required');
+        }
+    }
+
+    radioTerdaftar.addEventListener('change', toggleTipeTamu);
+    radioWalkin.addEventListener('change', toggleTipeTamu);
+    toggleTipeTamu();
+
+    function formatRp(num) {
+        return 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(num));
+    }
+
+    function renderTotals() {
+        const diskon = discountInfo.value > 0
+            ? (discountInfo.isPercent
+                ? currentSubtotal * (discountInfo.value / 100)
+                : Math.min(discountInfo.value, currentSubtotal))
+            : 0;
+        const totalAkhir = Math.max(0, currentSubtotal - diskon);
+
+        previewTotal.textContent = formatRp(currentSubtotal);
+
+        if (diskon > 0) {
+            previewDiskonRow.style.display = 'flex';
+            previewDiskon.textContent = '- ' + formatRp(diskon);
+        } else {
+            previewDiskonRow.style.display = 'none';
+        }
+
+        previewTotalAkhir.textContent = formatRp(totalAkhir);
+    }
 
     function updatePreview() {
         const selectedOption = tipeSelect.options[tipeSelect.selectedIndex];
         const harga = selectedOption ? parseInt(selectedOption.dataset.harga) || 0 : 0;
         const tipeNama = selectedOption ? selectedOption.dataset.nama || selectedOption.text.split(' -')[0] : 'Belum dipilih';
-        
+
         previewTipe.textContent = tipeNama;
-        previewHarga.textContent = 'Rp ' + new Intl.NumberFormat('id-ID').format(harga);
-        
+        previewHarga.textContent = formatRp(harga);
+
         let malam = 0;
-        let total = 0;
+        let subtotal = 0;
         let tanggalText = '-';
-        
+
         if (tglCheckin.value && tglCheckout.value) {
             const checkin = new Date(tglCheckin.value);
             const checkout = new Date(tglCheckout.value);
-            
+
             if (checkout > checkin) {
                 const diffTime = Math.abs(checkout - checkin);
                 malam = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                total = harga * malam;
+                subtotal = harga * malam;
                 const formatDate = (date) => date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
                 tanggalText = `${formatDate(checkin)} → ${formatDate(checkout)}`;
             } else if (checkout.getTime() === checkin.getTime()) {
                 malam = 1;
-                total = harga;
+                subtotal = harga;
                 tanggalText = 'Check-in & Check-out sama hari (1 malam)';
             } else {
                 tanggalText = 'Tanggal check-out harus setelah check-in';
             }
         }
-        
-        previewMalam.textContent = malam + (malam === 1 ? ' malam' : ' malam');
+
+        previewMalam.textContent = malam + ' malam';
         previewTanggal.textContent = tanggalText;
-        previewTotal.textContent = 'Rp ' + new Intl.NumberFormat('id-ID').format(total);
+        currentSubtotal = subtotal;
+        renderTotals();
     }
-    
+
+    promoSelect.addEventListener('change', function() {
+        const opt = promoSelect.options[promoSelect.selectedIndex];
+        discountInfo = promoSelect.value
+            ? { value: parseFloat(opt.dataset.nominal) || 0, isPercent: opt.dataset.tipe === 'persen', source: 'promo' }
+            : { value: 0, isPercent: false, source: null };
+        renderTotals();
+    });
+
+    btnCekVoucher.addEventListener('click', function() {
+        const kode = voucherInput.value.trim();
+        if (!kode) {
+            voucherFeedback.innerHTML = '<i class="fas fa-exclamation-circle text-warning"></i> Isi kode voucher dulu.';
+            return;
+        }
+
+        voucherFeedback.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengecek voucher...';
+
+        fetch("{{ route('dashboard.hotel.reservasi.checkVoucher') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+            },
+            body: JSON.stringify({ kode: kode })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.valid) {
+                voucherFeedback.innerHTML = '<i class="fas fa-check-circle text-success"></i> Voucher valid: ' + data.nama_promo;
+                discountInfo = { value: parseFloat(data.nominal_potongan) || 0, isPercent: data.tipe_diskon === 'persen', source: 'voucher' };
+                promoSelect.value = '';
+                promoSelect.disabled = true;
+            } else {
+                voucherFeedback.innerHTML = '<i class="fas fa-times-circle text-danger"></i> ' + data.message;
+                discountInfo = { value: 0, isPercent: false, source: null };
+                promoSelect.disabled = false;
+            }
+            renderTotals();
+        })
+        .catch(() => {
+            voucherFeedback.innerHTML = '<i class="fas fa-times-circle text-danger"></i> Gagal mengecek voucher, coba lagi.';
+        });
+    });
+
+    voucherInput.addEventListener('input', function() {
+        if (voucherInput.value.trim() === '' && discountInfo.source === 'voucher') {
+            discountInfo = { value: 0, isPercent: false, source: null };
+            voucherFeedback.innerHTML = '';
+            promoSelect.disabled = false;
+            renderTotals();
+        }
+    });
+
     tipeSelect.addEventListener('change', updatePreview);
     tglCheckin.addEventListener('change', updatePreview);
     tglCheckout.addEventListener('change', updatePreview);
@@ -564,6 +759,11 @@ function resetForm() {
         document.getElementById('tipe_kamar_id').dispatchEvent(event);
         document.getElementById('tgl_checkin').dispatchEvent(event);
         document.getElementById('tgl_checkout').dispatchEvent(event);
+        document.getElementById('promo_id').dispatchEvent(event);
+        document.getElementById('promo_id').disabled = false;
+        document.getElementById('voucherFeedback').innerHTML = '';
+        document.getElementById('tipe_tamu_terdaftar').checked = true;
+        document.getElementById('tipe_tamu_terdaftar').dispatchEvent(new Event('change'));
     }, 50);
 }
 </script>
