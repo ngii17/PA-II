@@ -16,7 +16,7 @@ class ApiServices {
 
   static const String ipAddress = String.fromEnvironment(
     'API_IP',
-    defaultValue: '10.112.252.132',
+    defaultValue: '10.181.37.248',
   );
   static const String baseUrl = "http://$ipAddress:8001/api";
   static const String _authUrl = "http://$ipAddress:8000/api";

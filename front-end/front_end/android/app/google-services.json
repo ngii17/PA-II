@@ -1,13 +1,13 @@
-﻿{
+{
   "project_info": {
-    "project_number": "821334012873",
-    "project_id": "purnama-hotel",
-    "storage_bucket": "purnama-hotel.firebasestorage.app"
+    "project_number": "933746540276",
+    "project_id": "purnama-balige",
+    "storage_bucket": "purnama-balige.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:821334012873:android:ac8c87e3b6c75caa19ae18",
+        "mobilesdk_app_id": "1:933746540276:android:5553daf4b8ffb7cbace8a1",
         "android_client_info": {
           "package_name": "com.example.front_end"
         }
@@ -15,7 +15,26 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBrb19PWdZHQ2N8UVy0nbI9f5mffEJ3mXc"
+          "current_key": "AIzaSyAHEtJtOtxq60mYWhyK4lnHJ4Wdr7bm5Mc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933746540276:android:eaf377fbec8aceb8ace8a1",
+        "android_client_info": {
+          "package_name": "com.purnama.purnama"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHEtJtOtxq60mYWhyK4lnHJ4Wdr7bm5Mc"
         }
       ],
       "services": {

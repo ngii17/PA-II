@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'firebase_options.dart';
 import 'providers/event_provider.dart';
 import 'providers/cart_provider.dart';
 import 'notification/notification_service.dart';
@@ -19,10 +19,30 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await Firebase.initializeApp();
-    await PushNotificationService.initialize();
-    _setupNotificationInteractions();
-    debugPrint("LOG_SYSTEM: Firebase & Notification System Ready");
+    await Firebase.initializeApp(
+  options: DefaultFirebaseOptions.currentPlatform,
+);
+
+// Request permission notifikasi
+await FirebaseMessaging.instance.requestPermission(
+  alert: true,
+  badge: true,
+  sound: true,
+);
+
+// Ambil FCM Token
+String? token = await FirebaseMessaging.instance.getToken();
+
+debugPrint("=================================");
+debugPrint("FCM TOKEN:");
+debugPrint(token);
+debugPrint("=================================");
+
+await PushNotificationService.initialize();
+
+_setupNotificationInteractions();
+
+debugPrint("LOG_SYSTEM: Firebase & Notification System Ready");
   } catch (e) {
     debugPrint("LOG_ERROR: Gagal inisialisasi Firebase: $e");
   }

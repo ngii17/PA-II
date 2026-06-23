@@ -566,8 +566,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ── Charts ── */
     var labels    = @json($bulanLabels);
-    var hotelData = @json($reservasiPerBulan->pluck('total')->toArray());
-    var restoData = @json($pesananPerBulan->pluck('total')->toArray());
+    var hotelData = @json($reservasiPerBulan->values()->toArray());
+    var restoData = @json($pesananPerBulan->values()->toArray());
     var font      = { family: 'Plus Jakarta Sans, sans-serif', size: 11 };
     var sharedOpts = {
         responsive: true,

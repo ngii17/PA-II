@@ -113,11 +113,31 @@ class DashboardController extends Controller
             $data['arrival_today'] = Reservasi::with(['tipeKamar', 'kamar'])
                 ->whereDate('tgl_checkin', $today)
                 ->where('status_reservasi_id', '!=', 5)->get();
+                
+                // TAMBAHAN: Tren reservasi 6 bulan terakhir
+                    $statusLunasHotel = [2, 3, 4];
+                    $labelsHotel = [];
+                    $hotelData = [];
+
+                    for ($i = 5; $i >= 0; $i--) {
+                        $monthDate = now()->subMonths($i);
+                        $labelsHotel[] = $monthDate->format('M Y');
+
+                        $hotelData[] = Reservasi::whereIn('status_reservasi_id', $statusLunasHotel)
+                            ->whereMonth('created_at', $monthDate->month)
+                            ->whereYear('created_at', $monthDate->year)
+                            ->count();
+                    
+
+                    $data['bulan_labels'] = $labelsHotel;
+                    $data['reservasi_per_bulan'] = $hotelData;
+                }
         }
 
         // ============================================================
         // 🍽️ BAGIAN 3: DASHBOARD STAFF RESTORAN
         // ============================================================
+
         if ($role === 'staff restoran') {
             $data['total_pesanan']   = PesananMenu::count();
             $data['pesanan_pending'] = PesananMenu::where('status_pembayaran_id', 1)->count();
@@ -128,6 +148,24 @@ class DashboardController extends Controller
 
             $data['pesanan_terbaru'] = PesananMenu::with(['statusPembayaran'])
                 ->orderBy('created_at', 'desc')->limit(5)->get();
+
+            // TAMBAHAN: Tren pesanan resto 6 bulan terakhir
+            $statusLunasResto = [2]; // Lunas
+            $labelsResto = [];
+            $restoData = [];
+
+            for ($i = 5; $i >= 0; $i--) {
+                $monthDate = now()->subMonths($i);
+                $labelsResto[] = $monthDate->format('M Y');
+
+                $restoData[] = PesananMenu::whereIn('status_pembayaran_id', $statusLunasResto)
+                    ->whereMonth('created_at', $monthDate->month)
+                    ->whereYear('created_at', $monthDate->year)
+                    ->count();
+            }
+
+            $data['bulan_labels'] = $labelsResto;
+            $data['pesanan_per_bulan'] = $restoData;
         }
 
         return view('dashboard.index', compact('user', 'data'));
