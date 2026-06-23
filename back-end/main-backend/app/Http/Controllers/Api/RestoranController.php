@@ -38,7 +38,7 @@ public function getMenus()
             $activeEvent = Event::where('is_active', true)->first();
 
             // 2. Cari Promo Global Restoran (is_active = true)
-            $promoGlobal = \App\Models\Hotel\Promo::where('kategori', 'restoran')
+            $promoGlobal = \App\Models\Hotel\Promo::whereIn('kategori', ['restoran', 'semua'])
                 ->where('is_active', true)
                 ->whereNull('kode_promo')
                 ->whereDate('tgl_mulai', '<=', now())

@@ -36,10 +36,10 @@ class HotelController extends Controller
     public function getRoomTypes()
     {
         try {
-            $tipeKamar = TipeKamar::all();
+            $tipeKamar = TipeKamar::withCount(["kamar" => function ($query) { $query->where("status_kamar_id", 1); }])->get();
 
             // --- PERBAIKAN: Ditambahkan pengecekan is_active ---
-            $promoAktif = Promo::where('kategori', 'hotel')
+            $promoAktif = Promo::whereIn('kategori', ['hotel', 'semua'])
                 ->where('is_active', true) // <--- Hanya ambil jika saklar aktif (true)
                 ->whereNull('kode_promo') // Hanya promo otomatis (tanpa kode)
                 ->whereDate('tgl_mulai', '<=', now())
@@ -86,6 +86,7 @@ class HotelController extends Controller
                     'fasilitas'   => $item->fasilitas,
                     'deskripsi'   => $item->deskripsi,
                     'promo_aktif' => $infoPromo,
+                    'kamar_tersedia' => $item->kamar_count,
                 ];
             });
 
