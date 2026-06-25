@@ -103,7 +103,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     // Jika hanya nama file (avatar3.png), construct URL
     // Sumber IP sekarang terpusat di ApiServices, bukan ProfileScreen lagi
-    return 'http://${ApiServices.ipAddress}:8000/avatars/$avatarNameOrUrl';
+    return 'https://purnama-hotel.duckdns.org/auth/avatars/$avatarNameOrUrl';  
+
   }
 
   void _showAvatarPicker(Color primaryColor, Color buttonColor, Color buttonTextColor) {

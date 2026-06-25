@@ -14,14 +14,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 class ApiServices {
 
-  static const String ipAddress = String.fromEnvironment(
-    'API_IP',
-    defaultValue: '10.112.252.132',
-  );
-  static const String baseUrl = "http://$ipAddress:8001/api";
-  static const String _authUrl = "http://$ipAddress:8000/api";
-  static const String _hotelUrl = "http://$ipAddress:8001/api";
-  static const String _notifUrl = "http://$ipAddress:8002/api";
+  static const String _authUrl = "https://purnama-hotel.duckdns.org/auth/api";
+  static const String _hotelUrl = "https://purnama-hotel.duckdns.org/api";
+  static const String _notifUrl = "https://purnama-hotel.duckdns.org/notif/api";
+  static const String baseUrl = _hotelUrl;
 
   // ==========================================
   // FUNGSI KHUSUS HOTEL (Server Port 8001)
@@ -44,18 +40,20 @@ class ApiServices {
   // ==========================================
 
   static Future<Map<String, dynamic>> register(Map<String, dynamic> data) async {
-    try {
-      final response = await http.post(
-        Uri.parse("$_authUrl/register"),
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: jsonEncode(data),
-      );
-      return jsonDecode(response.body);
-    } catch (e) {
-      return {'success': false, 'message': 'Koneksi gagal: $e'};
-    }
+  try {
+    final url = "$_authUrl/register";
+    print("DEBUG REGISTER URL: $url"); // ← tambah ini
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: jsonEncode(data),
+    );
+    print("DEBUG RESPONSE: ${response.statusCode} - ${response.body}"); // ← dan ini
+    return jsonDecode(response.body);
+  } catch (e) {
+    return {'success': false, 'message': 'Koneksi gagal: $e'};
   }
-
+}
   static Future<Map<String, dynamic>> verifyOtp(String email, String otp) async {
     try {
       final response = await http.post(
@@ -120,6 +118,19 @@ class ApiServices {
         final SharedPreferences prefs = await SharedPreferences.getInstance();
         int loginTime = DateTime.now().millisecondsSinceEpoch;
         await prefs.setInt('last_login_time', loginTime);
+        
+        // Simpan token
+        if (data['access_token'] != null) {
+          await prefs.setString('auth_token', data['access_token']);
+        }
+        // Simpan data user
+        if (data['user'] != null) {
+          await prefs.setString('user_data', jsonEncode(data['user']));
+        }
+        if (data['access_token'] != null) {
+          await prefs.setString('auth_token', data['access_token']);
+          print("DEBUG TOKEN SAVED: ${data['access_token']}");
+        }
       }
 
       return data;
@@ -131,7 +142,9 @@ class ApiServices {
   static Future<Map<String, dynamic>> storeReservation(Map<String, dynamic> data) async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final String? token = prefs.getString('auth_token'); // ← sama seperti logout
+      final String? token = prefs.getString('auth_token');
+      
+      print("DEBUG TOKEN: $token"); // ← tambah ini
 
       if (token == null) {
         return {'success': false, 'message': 'Token tidak ditemukan, silakan login ulang'};
@@ -167,7 +180,15 @@ class ApiServices {
           'Authorization': 'Bearer $token',
         },
       );
-      return jsonDecode(response.body);
+
+      var data = jsonDecode(response.body);
+
+      // Hapus token dan data user setelah logout
+      await prefs.remove('auth_token');
+      await prefs.remove('user_data');
+      await prefs.remove('last_login_time');
+
+      return data;
     } catch (e) {
       return {'success': false, 'message': 'Gagal logout: $e'};
     }
@@ -292,6 +313,8 @@ class ApiServices {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('auth_token');
+      
+      print("DEBUG PROFILE TOKEN: $token");
 
       final response = await http.get(
         Uri.parse("$_authUrl/user/profile"),
@@ -301,6 +324,9 @@ class ApiServices {
           'Authorization': 'Bearer $token',
         },
       );
+      
+      print("DEBUG PROFILE RESPONSE: ${response.statusCode} - ${response.body}");
+      
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Gagal terhubung ke server identitas: $e'};

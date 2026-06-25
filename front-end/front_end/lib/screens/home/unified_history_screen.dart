@@ -5,7 +5,9 @@ import '../restoran/order_history_screen.dart';
 import '../../providers/event_provider.dart';
 
 class UnifiedHistoryScreen extends StatefulWidget {
-  const UnifiedHistoryScreen({super.key});
+  final VoidCallback? onBack; // ✅
+
+  const UnifiedHistoryScreen({super.key, this.onBack}); // ✅
 
   @override
   State<UnifiedHistoryScreen> createState() => _UnifiedHistoryScreenState();
@@ -66,7 +68,9 @@ class _UnifiedHistoryScreenState extends State<UnifiedHistoryScreen>
                 Row(
                   children: [
                     IconButton(
-                      onPressed: () => Navigator.pop(context),
+                    onPressed: widget.onBack ?? () {
+                      if (Navigator.canPop(context)) Navigator.pop(context);
+                    },
                       icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                     ),
                     const Spacer(),

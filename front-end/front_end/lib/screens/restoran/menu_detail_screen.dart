@@ -305,7 +305,7 @@ class _MenuDetailScreenState extends State<MenuDetailScreen> {
   // ── GAMBAR MENU ─────────────────────────────────────────────────────────────
 
   Widget _buildMenuImage() {
-final String storageUrl = "http://${ApiServices.ipAddress}:8001/storage";
+final String storageUrl = "https://purnama-hotel.duckdns.org/storage";
 
 final String? finalImageUrl = widget.menu.fotoMenu != null
     ? (widget.menu.fotoMenu!.startsWith('http')

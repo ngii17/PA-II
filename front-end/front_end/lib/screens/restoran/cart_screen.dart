@@ -287,16 +287,15 @@ class _CartItemCard extends StatelessWidget {
 
   String _processImageUrl(String? imageUrl) {
     String finalImageUrl = imageUrl ?? "";
-    
-    if (finalImageUrl.contains(RegExp(r'\d+\.\d+\.\d+\.\d+'))) {
-      finalImageUrl = finalImageUrl.replaceAll(RegExp(r'\d+\.\d+\.\d+\.\d+'), ApiServices.ipAddress);
-    } else if (finalImageUrl.isNotEmpty && !finalImageUrl.startsWith('http')) {
-      finalImageUrl = "http://${ApiServices.ipAddress}:8001/storage/$finalImageUrl";
-    }
-    
-    return finalImageUrl;
-  }
 
+    if (finalImageUrl.isEmpty) return finalImageUrl;
+
+    // Kalau URL sudah lengkap (http/https), langsung return
+    if (finalImageUrl.startsWith('http')) return finalImageUrl;
+
+    // Kalau cuma path relatif, tambahkan base URL storage
+    return "https://purnama-hotel.duckdns.org/storage/$finalImageUrl";
+  }
   @override
   Widget build(BuildContext context) {
     final bool hasPromo = menu.promoAktif != null && (menu.hargaAkhir < menu.hargaAsli);

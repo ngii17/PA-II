@@ -256,9 +256,13 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                                 const SizedBox(width: 8),
                                 _StatChip(
                                   icon: Icons.check_circle_rounded,
-                                  label: "Tersedia",
-                                  iconColor: Colors.green.shade600,
-                                  bgColor: Colors.green.shade50,
+                                  label: "${widget.room.kamarTersedia} Tersedia",
+                                  iconColor: widget.room.kamarTersedia > 0
+                                      ? Colors.green.shade600
+                                      : Colors.red.shade600,
+                                  bgColor: widget.room.kamarTersedia > 0
+                                      ? Colors.green.shade50
+                                      : Colors.red.shade50,
                                 ),
                               ],
                             ),

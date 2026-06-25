@@ -10,6 +10,7 @@ class RoomType {
   final int kapasitas;
   final String fasilitas;
   final String deskripsi;
+  final int kamarTersedia; // ✅ TAMBAHAN
 
   RoomType({
     required this.id,
@@ -21,6 +22,7 @@ class RoomType {
     required this.kapasitas,
     required this.fasilitas,
     required this.deskripsi,
+    this.kamarTersedia = 0, // ✅ TAMBAHAN
   });
 
   factory RoomType.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,7 @@ class RoomType {
       kapasitas: (json['kapasitas'] as num?)?.toInt() ?? 0,
       fasilitas: json['fasilitas'] ?? '',
       deskripsi: json['deskripsi'] ?? '',
+      kamarTersedia: (json['kamar_tersedia'] as num?)?.toInt() ?? 0, // ✅ TAMBAHAN
     );
   }
 

@@ -42,16 +42,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   String _processImageUrl(String? imageUrl) {
     String finalImageUrl = imageUrl ?? "";
-    
-    if (finalImageUrl.contains(RegExp(r'\d+\.\d+\.\d+\.\d+'))) {
-      finalImageUrl = finalImageUrl.replaceAll(RegExp(r'\d+\.\d+\.\d+\.\d+'), ApiServices.ipAddress);
-    } else if (finalImageUrl.isNotEmpty && !finalImageUrl.startsWith('http')) {
-      finalImageUrl = "http://${ApiServices.ipAddress}:8001/storage/$finalImageUrl";
-    }
-    
-    return finalImageUrl;
-  }
 
+    if (finalImageUrl.isEmpty) return finalImageUrl;
+
+    if (finalImageUrl.startsWith('http')) return finalImageUrl;
+
+    return "https://purnama-hotel.duckdns.org/storage/$finalImageUrl";
+  }
   void _showRestoReviewDialog(BuildContext context, int menuId, String menuName,
       {bool isEdit = false, int? reviewId, Map<String, dynamic>? existingData}) {
     final TextEditingController commentController = TextEditingController(

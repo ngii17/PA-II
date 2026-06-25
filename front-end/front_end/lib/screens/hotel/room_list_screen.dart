@@ -29,7 +29,12 @@ class _AppColors {
 //  ROOM LIST SCREEN
 // ─────────────────────────────────────────────
 class RoomListScreen extends StatefulWidget {
-  const RoomListScreen({super.key});
+  // ✅ CHANGE 1: tambahkan onBack opsional.
+  // Kalau null (dibuka via Navigator.push), fallback ke Navigator.pop biasa.
+  // Kalau diisi (dibuka sebagai tab di IndexedStack), dipakai untuk pindah tab balik ke Home.
+  final VoidCallback? onBack;
+
+  const RoomListScreen({super.key, this.onBack});
 
   @override
   State<RoomListScreen> createState() => _RoomListScreenState();
@@ -133,6 +138,11 @@ class _RoomListScreenState extends State<RoomListScreen> {
             selectedFilter: _selectedFilter,
             onFilterSelect: (f) => setState(() => _selectedFilter = f),
             buildPurnamaLogo: _buildPurnamaLogo,
+            // ✅ CHANGE 2: pakai widget.onBack kalau ada, kalau tidak fallback pop biasa
+            onBack: widget.onBack ??
+                () {
+                  if (Navigator.canPop(context)) Navigator.pop(context);
+                },
           ),
 
           // ── BODY (SCROLLABLE) ──
@@ -246,6 +256,7 @@ class _RoomHeader extends StatelessWidget {
   final String selectedFilter;
   final ValueChanged<String> onFilterSelect;
   final Widget Function() buildPurnamaLogo;
+  final VoidCallback onBack; // ✅ CHANGE 3: terima onBack dari parent
 
   const _RoomHeader({
     required this.topPadding,
@@ -257,6 +268,7 @@ class _RoomHeader extends StatelessWidget {
     required this.selectedFilter,
     required this.onFilterSelect,
     required this.buildPurnamaLogo,
+    required this.onBack, // ✅ CHANGE 3
   });
 
   @override
@@ -299,19 +311,23 @@ class _RoomHeader extends StatelessWidget {
               Row(
                 children: [
                   // ── TOMBOL BACK ──
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white70,
-                        size: 16,
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onBack, // ✅ pakai callback dari parent
+                      borderRadius: BorderRadius.circular(17),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -366,50 +382,47 @@ class _RoomHeader extends StatelessWidget {
         ),
 
         // ── SEARCH BAR ──
-        Transform.translate(
-          offset: const Offset(0, -14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.search_rounded, color: accentColor, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      onChanged: onSearchChanged,
-                      style: const TextStyle(fontSize: 13, color: _AppColors.textDark),
-                      decoration: const InputDecoration(
-                        hintText: "Cari tipe kamar atau fasilitas...",
-                        hintStyle: TextStyle(color: _AppColors.textHint, fontSize: 13),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search_rounded, color: accentColor, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    onChanged: onSearchChanged,
+                    style: const TextStyle(fontSize: 13, color: _AppColors.textDark),
+                    decoration: const InputDecoration(
+                      hintText: "Cari tipe kamar atau fasilitas...",
+                      hintStyle: TextStyle(color: _AppColors.textHint, fontSize: 13),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: _AppColors.navyDark.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.tune_rounded, color: _AppColors.navyDark, size: 16),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _AppColors.navyDark.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ],
-              ),
+                  child: const Icon(Icons.tune_rounded, color: _AppColors.navyDark, size: 16),
+                ),
+              ],
             ),
           ),
         ),
@@ -571,8 +584,6 @@ class _RoomCard extends StatelessWidget {
                             child: Text(f, style: TextStyle(fontSize: 9, color: primaryColor, fontWeight: FontWeight.w600)),
                           )).toList(),
                         ),
-                        const SizedBox(height: 8),
-                        const Row(children: [Icon(Icons.star_rounded, size: 13, color: Color(0xFFF59E0B)), SizedBox(width: 3), Text("4.9  (123 ulasan)", style: TextStyle(fontSize: 10, color: _AppColors.textMuted))]),
                         const SizedBox(height: 8),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

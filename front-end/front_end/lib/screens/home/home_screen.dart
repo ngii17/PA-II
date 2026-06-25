@@ -60,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double>   _shakeAnimation;
 
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _promoSectionKey = GlobalKey();
 
   @override
   void initState() {
@@ -208,8 +209,23 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _scrollToPromo() {
+    final ctx = _promoSectionKey.currentContext;    if (ctx == null) return;
+
+    final renderBox = ctx.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final scrollableBox = _scrollController.position.context.storageContext
+        .findRenderObject() as RenderBox?;
+
+    final offset = renderBox
+        .localToGlobal(Offset.zero, ancestor: scrollableBox)
+        .dy;
+
+    final targetOffset = (_scrollController.offset + offset - 16)
+        .clamp(0.0, _scrollController.position.maxScrollExtent);
+
     _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent * 0.6,
+      targetOffset,
       duration: const Duration(milliseconds: 800),
       curve: Curves.easeInOut,
     );
@@ -264,10 +280,11 @@ class _HomeScreenState extends State<HomeScreen>
           onRefresh: _refreshData,
           scrollController: _scrollController,
           onPromoPressed: _scrollToPromo,
+          promoSectionKey: _promoSectionKey,
         );
-      case 1: return const RoomListScreen();
-      case 2: return const MenuListScreen();
-      case 3: return const UnifiedHistoryScreen();
+      case 1: return RoomListScreen(onBack: () => setState(() => _currentIndex = 0));      
+      case 2: return MenuListScreen(onBack: () => setState(() => _currentIndex = 0));
+      case 3: return UnifiedHistoryScreen(onBack: () => setState(() => _currentIndex = 0));
       case 4: return const ProfileScreen();
       default: return const SizedBox.shrink();
     }
@@ -285,6 +302,7 @@ class _HomeDashboard extends StatefulWidget {
   final Future<void> Function() onRefresh;
   final ScrollController scrollController;
   final VoidCallback onPromoPressed;
+  final GlobalKey promoSectionKey;
 
   const _HomeDashboard({
     super.key,
@@ -298,6 +316,7 @@ class _HomeDashboard extends StatefulWidget {
     required this.onRefresh,
     required this.scrollController,
     required this.onPromoPressed,
+    required this.promoSectionKey,
   });
 
   @override
@@ -508,7 +527,7 @@ class _HomeDashboardState extends State<_HomeDashboard> {
   String _buildImageUrl(String? rawFoto) {
     if (rawFoto == null || rawFoto.isEmpty) return "";
     if (rawFoto.startsWith('http')) return rawFoto;
-    return "http://${ApiServices.ipAddress}:8001/storage/$rawFoto";
+    return "https://purnama-hotel.duckdns.org/storage/$rawFoto";
   }
 
   // ============================================================
@@ -560,7 +579,7 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                     ),
                   ),
                   Text(
-                    'Kamar',
+                    'Tipe Kamar',
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 10,
@@ -789,6 +808,7 @@ class _HomeDashboardState extends State<_HomeDashboard> {
     if (_activePromos.isEmpty) return const SizedBox.shrink();
 
     return Column(
+      key: widget.promoSectionKey,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -1334,6 +1354,7 @@ class _HomeDashboardState extends State<_HomeDashboard> {
         ),
 
         // ── SEARCH BAR ──
+        // ── SEARCH BAR ──
         Transform.translate(
           offset: const Offset(0, -22),
           child: Padding(
@@ -1521,7 +1542,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.only(
-          top: topPadding + 16, left: 20, right: 20, bottom: 40),
+          top: topPadding + 12, left: 20, right: 20, bottom: 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -1532,7 +1553,7 @@ class _Header extends StatelessWidget {
             accentColor.withOpacity(0.55),
           ],
         ),
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(40)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
             color: primaryColor.withOpacity(0.35),
@@ -1668,11 +1689,11 @@ class _Header extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 22),
+          const SizedBox(height: 6),
 
           Text(
             isGuest ? "Selamat Datang 👋" : "Halo, 👋",
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 2),
           Text(
@@ -1681,17 +1702,9 @@ class _Header extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
                 color: Colors.white,
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.3),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Nikmati layanan hotel & restoran terbaik kami",
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
-              fontSize: 12,
-            ),
           ),
         ],
       ),
@@ -1763,29 +1776,22 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.search_rounded, color: accentColor, size: 18),
-            ),
-            const SizedBox(width: 12),
+            Icon(Icons.search_rounded, color: accentColor, size: 20),
+            const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -1797,6 +1803,7 @@ class _SearchBar extends StatelessWidget {
                     fontSize: 13,
                   ),
                   isDense: true,
+                  contentPadding: EdgeInsets.zero,
                 ),
                 style: const TextStyle(
                   color: _AppColors.textMain,

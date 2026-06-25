@@ -173,7 +173,10 @@ class EventHeader extends StatelessWidget {
   }
 
   String? _extractImageUrl(dynamic value) {
-    if (value is String && value.isNotEmpty) return value;
+    if (value is String && value.isNotEmpty) {
+      if (value.startsWith('http')) return value;
+      return 'https://purnama-hotel.duckdns.org/storage/$value';
+    }
     return null;
   }
 }

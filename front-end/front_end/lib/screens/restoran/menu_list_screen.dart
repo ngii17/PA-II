@@ -24,11 +24,15 @@ class _AppColors {
 }
 
 class MenuListScreen extends StatefulWidget {
-  const MenuListScreen({super.key});
+  final VoidCallback? onBack; // ✅ tambah ini
+
+  const MenuListScreen({super.key, this.onBack}); // ✅ update constructor
 
   @override
   State<MenuListScreen> createState() => _MenuListScreenState();
 }
+
+
 
 class _MenuListScreenState extends State<MenuListScreen> {
   late Future<Map<String, dynamic>> _menuData;
@@ -130,6 +134,9 @@ class _MenuListScreenState extends State<MenuListScreen> {
             searchQuery: _searchQuery,
             onSearchChanged: (v) => setState(() => _searchQuery = v),
             buildPurnamaLogo: _buildPurnamaLogo,
+            onBack: widget.onBack ?? () { // ✅ tambah ini
+              if (Navigator.canPop(context)) Navigator.pop(context);
+            },
           ),
 
           // ── KATEGORI TETAP (STICKY) ──
@@ -295,6 +302,7 @@ class _MenuHeader extends StatelessWidget {
   final String      searchQuery;
   final ValueChanged<String> onSearchChanged;
   final Widget Function() buildPurnamaLogo;
+  final VoidCallback onBack;
 
   const _MenuHeader({
     required this.topPadding,
@@ -304,6 +312,7 @@ class _MenuHeader extends StatelessWidget {
     required this.searchQuery,
     required this.onSearchChanged,
     required this.buildPurnamaLogo,
+    required this.onBack,
   });
 
   @override
@@ -346,7 +355,7 @@ class _MenuHeader extends StatelessWidget {
                 children: [
                   // ── TOMBOL BACK ──
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: onBack,
                     child: Container(
                       width: 34,
                       height: 34,
@@ -583,10 +592,8 @@ class _MenuCard extends StatelessWidget {
 
     String finalImageUrl = menu.fotoMenu ?? "";
     
-    if (finalImageUrl.contains(RegExp(r'\d+\.\d+\.\d+\.\d+'))) {
-      finalImageUrl = finalImageUrl.replaceAll(RegExp(r'\d+\.\d+\.\d+\.\d+'), ApiServices.ipAddress);
-    } else if (finalImageUrl.isNotEmpty && !finalImageUrl.startsWith('http')) {
-      finalImageUrl = "http://${ApiServices.ipAddress}:8001/storage/$finalImageUrl";
+    if (finalImageUrl.isNotEmpty && !finalImageUrl.startsWith('http')) {
+      finalImageUrl = "https://purnama-hotel.duckdns.org/storage/$finalImageUrl";
     }
 
     return GestureDetector(
@@ -680,9 +687,7 @@ class _MenuCard extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(menu.deskripsi, style: const TextStyle(fontSize: 10, color: _AppColors.textMuted), maxLines: 2, overflow: TextOverflow.ellipsis),
                       ],
-                    ),
-                    const Row(children: [Icon(Icons.star_rounded, size: 11, color: Color(0xFFF59E0B)), SizedBox(width: 3), Text("4.5  (120 ulasan)", style: TextStyle(fontSize: 9, color: _AppColors.textMuted))]),
-                    Row(
+                    ),                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Column(
